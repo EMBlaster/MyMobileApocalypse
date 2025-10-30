@@ -1,10 +1,12 @@
+import math # Import math for rounding in damage/stress calculations
+
 class Survivor:
     def __init__(self, name="Unnamed",
-                 str_val=1, agi_val=1, int_val=1, per_val=1,
-                 chr_val=1, con_val=1, san_val=1):
+                     str_val=1, agi_val=1, int_val=1, per_val=1,
+                     chr_val=1, con_val=1, san_val=1):
         self.name = name
 
-        # Attributes (1-10 range)
+        # Attributes (1-10 range) - Defaulting to 1 as per discussion
         self.attributes = {
             "STR": str_val,
             "AGI": agi_val,
@@ -15,18 +17,29 @@ class Survivor:
             "SAN": san_val,
         }
 
+        # Skills (New) - Dictionary mapping skill name to level
+        self.skills: dict[str, int] = {}
+
+        # Traits (New) - List of trait names (will be expanded with objects later)
+        self.traits: list[str] = []
+
+        # Individual Inventory (New) - Dictionary mapping item name to quantity
+        self.inventory: dict[str, int] = {}
+
         # Health
-        self.base_max_hp = 40 # Base for all
-        self.current_hp = self.calculate_max_hp()
+        self.base_max_hp = 40
         self.max_hp = self.calculate_max_hp() # CON * 10 bonus
+        self.current_hp = self.max_hp
 
         # Stress
-        self.base_max_stress = 40 # Base for all
-        self.current_stress = 0 # Starts at 0
+        self.base_max_stress = 40
         self.max_stress = self.calculate_max_stress() # SAN * 10 bonus
+        self.current_stress = 0 # Starts at 0
 
-        # Status
+        # Status Flags
         self.is_alive = True
+        self.is_injured = False # New: True if HP is below a certain threshold or has specific injury
+        self.is_stressed = False # New: True if Stress is above a certain threshold
 
         print(f"Survivor {self.name} created with attributes: {self.attributes}")
         print(f"Max HP: {self.max_hp}, Max Stress: {self.max_stress}")
@@ -39,78 +52,152 @@ class Survivor:
         # Base 40 + SAN * 10
         return self.base_max_stress + (self.attributes["SAN"] * 10)
 
-    def take_damage(self, amount):
+    def take_damage(self, amount: float):
         if not self.is_alive:
+            print(f"{self.name} is already incapacitated.")
             return
 
         # Apply CON damage reduction (5% per CON point, cap at 50% for CON 10)
         damage_reduction_percent = min(self.attributes["CON"] * 5, 50)
         actual_damage = amount * (1 - damage_reduction_percent / 100)
+        actual_damage = math.ceil(actual_damage) # Round up damage
 
         self.current_hp -= actual_damage
-        print(f"{self.name} took {actual_damage:.2f} damage. HP: {self.current_hp:.2f}")
+        print(f"{self.name} took {actual_damage} damage. HP: {self.current_hp:.2f}/{self.max_hp:.2f}")
 
         if self.current_hp <= 0:
             self.current_hp = 0
             self.is_alive = False
+            self.is_injured = True # Definitely injured if dead/incapacitated
             print(f"{self.name} has been incapacitated or died.")
-        elif self.current_hp > self.max_hp:
-            self.current_hp = self.max_hp # Cap HP at max
+        elif self.current_hp < self.max_hp * 0.5: # Example threshold for being injured
+            self.is_injured = True
+            print(f"{self.name} is injured!")
+        else:
+            self.is_injured = False
 
-    def gain_stress(self, amount):
+    def gain_stress(self, amount: float):
         if not self.is_alive:
+            print(f"{self.name} is incapacitated, cannot gain stress.")
             return
 
         # Apply SAN stress mitigation (e.g., 5% per SAN point, cap at 50% for SAN 10)
         stress_mitigation_percent = min(self.attributes["SAN"] * 5, 50)
         actual_stress_gain = amount * (1 - stress_mitigation_percent / 100)
+        actual_stress_gain = math.ceil(actual_stress_gain) # Round up stress gain
 
         self.current_stress += actual_stress_gain
         if self.current_stress > self.max_stress:
             self.current_stress = self.max_stress # Cap stress at max
+            self.is_stressed = True # New: Mark as stressed if at max
             print(f"{self.name} is critically stressed!")
-        print(f"{self.name} gained {actual_stress_gain:.2f} stress. Current Stress: {self.current_stress:.2f}")
+        elif self.current_stress > self.max_stress * 0.75: # Example threshold for being stressed
+            self.is_stressed = True
+            print(f"{self.name} is feeling highly stressed.")
+        else:
+            self.is_stressed = False
 
-    def reduce_stress(self, amount):
+        print(f"{self.name} gained {actual_stress_gain} stress. Current Stress: {self.current_stress:.2f}/{self.max_stress:.2f}")
+
+    def reduce_stress(self, amount: float):
         if not self.is_alive:
             return
         self.current_stress -= amount
         if self.current_stress < 0:
             self.current_stress = 0
-        print(f"{self.name} reduced stress by {amount}. Current Stress: {self.current_stress:.2f}")
+        if self.current_stress <= self.max_stress * 0.75: # Below stress threshold
+            self.is_stressed = False
+        print(f"{self.name} reduced stress by {amount}. Current Stress: {self.current_stress:.2f}/{self.max_stress:.2f}")
 
-    def heal(self, amount):
+    def heal(self, amount: float):
         if not self.is_alive:
+            print(f"{self.name} is incapacitated, cannot heal normally.")
             return
         self.current_hp += amount
         if self.current_hp > self.max_hp:
             self.current_hp = self.max_hp
-        print(f"{self.name} healed {amount}. Current HP: {self.current_hp:.2f}")
+        if self.current_hp >= self.max_hp * 0.5: # Above injured threshold
+            self.is_injured = False
+        print(f"{self.name} healed {amount}. Current HP: {self.current_hp:.2f}/{self.max_hp:.2f}")
+
+    # New: Methods for skills, traits, and inventory
+    def learn_skill(self, skill_name: str, level: int = 1):
+        """Adds or updates a skill for the survivor."""
+        if level < 0:
+            raise ValueError("Skill level cannot be negative.")
+        self.skills[skill_name] = level
+        print(f"{self.name} learned/updated skill '{skill_name}' to level {level}.")
+
+    def add_trait(self, trait_name: str):
+        """Adds a trait to the survivor."""
+        if trait_name not in self.traits:
+            self.traits.append(trait_name)
+            print(f"{self.name} gained trait '{trait_name}'.")
+        else:
+            print(f"{self.name} already has trait '{trait_name}'.")
+
+    def remove_trait(self, trait_name: str):
+        """Removes a trait from the survivor."""
+        if trait_name in self.traits:
+            self.traits.remove(trait_name)
+            print(f"{self.name} lost trait '{trait_name}'.")
+        else:
+            print(f"{self.name} does not have trait '{trait_name}'.")
+
+    def add_item_to_inventory(self, item_name: str, quantity: int = 1):
+        """Adds an item to the survivor's individual inventory."""
+        if quantity < 1:
+            raise ValueError("Quantity must be at least 1.")
+        self.inventory[item_name] = self.inventory.get(item_name, 0) + quantity
+        print(f"{self.name} added {quantity} of '{item_name}' to inventory. Total: {self.inventory[item_name]}")
+
+    def remove_item_from_inventory(self, item_name: str, quantity: int = 1) -> bool:
+        """Removes an item from the survivor's inventory, if available."""
+        if quantity < 1:
+            raise ValueError("Quantity must be at least 1.")
+        if self.inventory.get(item_name, 0) >= quantity:
+            self.inventory[item_name] -= quantity
+            if self.inventory[item_name] <= 0:
+                del self.inventory[item_name] # Remove if quantity reaches zero
+            print(f"{self.name} removed {quantity} of '{item_name}' from inventory. Remaining: {self.inventory.get(item_name, 0)}")
+            return True
+        else:
+            print(f"{self.name} does not have {quantity} of '{item_name}'. Current: {self.inventory.get(item_name, 0)}")
+            return False
 
 # --- Example Usage (for testing your code) ---
 if __name__ == "__main__":
     print("--- Creating Survivors ---")
-    survivor1 = Survivor(name="Alice", str_val=5, agi_val=6, int_val=7, per_val=8, chr_val=5, con_val=7, san_val=6)
-    survivor2 = Survivor(name="Bob", str_val=8, agi_val=4, int_val=3, per_val=5, chr_val=4, con_val=9, san_val=3)
+    survivor_alice = Survivor(name="Alice", str_val=5, agi_val=6, int_val=7, per_val=8, chr_val=5, con_val=7, san_val=6)
+    survivor_bob = Survivor(name="Bob", str_val=8, agi_val=4, int_val=3, per_val=5, chr_val=4, con_val=9, san_val=3)
 
-    print("\n--- Testing Alice's Stats ---")
-    print(f"Alice's CON: {survivor1.attributes['CON']}")
-    print(f"Alice's SAN: {survivor1.attributes['SAN']}")
-    print(f"Alice's Max HP: {survivor1.max_hp}")
-    print(f"Alice's Max Stress: {survivor1.max_stress}")
+    print("\n--- Testing Alice's Skills, Traits, Inventory ---")
+    survivor_alice.learn_skill("Mechanics", 1)
+    survivor_alice.learn_skill("Driving", 2)
+    survivor_alice.add_trait("Optimist")
+    survivor_alice.add_trait("Brave")
+    survivor_alice.add_item_to_inventory("Bandage", 3)
+    survivor_alice.add_item_to_inventory("Pistol", 1)
 
-    print("\n--- Alice takes damage ---")
-    survivor1.take_damage(50) # Raw damage, will be reduced by CON
-    survivor1.take_damage(100)
-    survivor1.take_damage(500) # Should die
+    print(f"Alice's skills: {survivor_alice.skills}")
+    print(f"Alice's traits: {survivor_alice.traits}")
+    print(f"Alice's inventory: {survivor_alice.inventory}")
+    survivor_alice.remove_item_from_inventory("Bandage", 1)
+    survivor_alice.remove_item_from_inventory("NonExistentItem")
 
-    print("\n--- Bob gains and reduces stress ---")
-    survivor2.gain_stress(30)
-    survivor2.gain_stress(40)
-    survivor2.gain_stress(100) # Should hit max stress
-    survivor2.reduce_stress(50)
-    survivor2.heal(20) # Healing a non-injured Bob
+    print("\n--- Testing Bob's HP/Stress thresholds ---")
+    print(f"Bob's HP: {survivor_bob.current_hp}/{survivor_bob.max_hp}, Is Injured: {survivor_bob.is_injured}")
+    survivor_bob.take_damage(50) # Should make Bob injured (CON 9, so good reduction)
+    print(f"Bob's HP: {survivor_bob.current_hp}/{survivor_bob.max_hp}, Is Injured: {survivor_bob.is_injured}")
+    survivor_bob.heal(30)
+    print(f"Bob's HP: {survivor_bob.current_hp}/{survivor_bob.max_hp}, Is Injured: {survivor_bob.is_injured}")
+
+    print(f"\nBob's Stress: {survivor_bob.current_stress}/{survivor_bob.max_stress}, Is Stressed: {survivor_bob.is_stressed}")
+    survivor_bob.gain_stress(100) # Should make Bob highly stressed (SAN 3, so not much reduction)
+    print(f"Bob's Stress: {survivor_bob.current_stress}/{survivor_bob.max_stress}, Is Stressed: {survivor_bob.is_stressed}")
+    survivor_bob.reduce_stress(50)
+    print(f"Bob's Stress: {survivor_bob.current_stress}/{survivor_bob.max_stress}, Is Stressed: {survivor_bob.is_stressed}")
 
     print("\n--- Final Status ---")
-    print(f"Alice alive: {survivor1.is_alive}, HP: {survivor1.current_hp:.2f}, Stress: {survivor1.current_stress:.2f}")
-    print(f"Bob alive: {survivor2.is_alive}, HP: {survivor2.current_hp:.2f}, Stress: {survivor2.current_stress:.2f}")
+    print(f"Alice alive: {survivor_alice.is_alive}, HP: {survivor_alice.current_hp:.2f}, Stress: {survivor_alice.current_stress:.2f}, Injured: {survivor_alice.is_injured}, Stressed: {survivor_alice.is_stressed}")
+    print(f"Bob alive: {survivor_bob.is_alive}, HP: {survivor_bob.current_hp:.2f}, Stress: {survivor_bob.current_stress:.2f}, Injured: {survivor_bob.is_injured}, Stressed: {survivor_bob.is_stressed}")
