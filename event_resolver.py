@@ -1,5 +1,5 @@
 import random
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Union # ADDED Union
 from survivor import Survivor
 from utils import roll_d100, chance_check # Assuming chance_check uses roll_d100
 from quests import Quest
@@ -15,7 +15,7 @@ CRITICAL_FAILURE_THRESHOLD = 5 # Roll <= 5 for critical failure
 
 def calculate_action_success_chance(
     survivors: List[Survivor],
-    action_obj: Quest | BaseJob,
+    action_obj: Union[Quest, BaseJob], # CHANGED
     action_type: str,
     node_danger_modifier: int = 0
 ) -> float:
