@@ -3,8 +3,9 @@ from survivor import Survivor
 from utils import roll_dice, chance_check
 from map_nodes import Node, AVAILABLE_NODES
 from character_creator import create_new_survivor
-from quests import Quest, AVAILABLE_QUESTS # NEW IMPORT
-from base_jobs import BaseJob, AVAILABLE_BASE_JOBS # NEW IMPORT
+from quests import Quest, AVAILABLE_QUESTS
+from base_jobs import BaseJob, AVAILABLE_BASE_JOBS
+from event_resolver import resolve_action # NEW IMPORT for event resolution
 
 # --- Constants for Travel Costs (can be adjusted later) ---
 TRAVEL_FUEL_COST = 5
@@ -22,12 +23,12 @@ class Game:
             "Fuel": 0,
             "Scrap": 0,
             "Ammunition": 0,
-            "ElectronicParts": 0, # Added for consistency with quest/job rewards
+            "ElectronicParts": 0,
         }
         self.game_map: dict[str, Node] = {}
         self.current_node: Node = None
-        self.player_vehicle = None # Placeholder for the player's vehicle/mobile base (will be a class later)
-        self.assigned_actions: list[dict] = [] # NEW: To track assignments for the current day
+        self.player_vehicle = None
+        self.assigned_actions: list[dict] = []
 
         print(f"Game initialized. Day: {self.game_day}")
 
@@ -173,8 +174,8 @@ class Game:
 
     def get_assignable_survivors(self) -> list[Survivor]:
         """Returns a list of survivors not yet assigned an action for the day."""
-        assigned_survivor_ids = [action['survivor'].name for action in self.assigned_actions if 'survivor' in action]
-        return [s for s in self.survivors if s.name not in assigned_survivor_ids and s.is_alive]
+        assigned_survivor_names = [s.name for action in self.assigned_actions for s in action['survivors']]
+        return [s for s in self.survivors if s.name not in assigned_survivor_names and s.is_alive]
 
     def get_available_quests_for_node(self) -> dict[str, Quest]:
         """Returns quests relevant to the current node."""
@@ -189,7 +190,6 @@ class Game:
 
     def get_available_base_jobs(self) -> dict[str, BaseJob]:
         """Returns all currently available base jobs."""
-        # For now, all base jobs are always available. Can be filtered later by base upgrades.
         return AVAILABLE_BASE_JOBS
 
     def assign_actions_for_day(self):
@@ -197,12 +197,16 @@ class Game:
         Allows the player to assign survivors to quests or base jobs.
         """
         self.assigned_actions = [] # Reset assignments for the new day
-        assignable_survivors = self.get_assignable_survivors()
         
         print("\n--- Assign Actions for Today ---")
-        while assignable_survivors:
+        while True:
+            assignable_survivors = self.get_assignable_survivors()
+            if not assignable_survivors:
+                print("\nAll active survivors have been assigned an action or are resting.")
+                break
+
             self.display_game_state() # Show current state, especially available survivors
-            print(f"\nSurvivors to assign: {[s.name for s in assignable_survivors]}")
+            print(f"\nSurvivors still needing assignments: {[s.name for s in assignable_survivors]}")
             
             print("\nChoose an action type (or 'done' to finish assignments):")
             print("1. Assign to Quest")
@@ -234,21 +238,20 @@ class Game:
 
                     print(f"Assigning survivors to: {chosen_quest.name}")
                     assigned_to_quest = []
+                    temp_assignable = list(assignable_survivors) # Make a temp copy to select from
                     for _ in range(chosen_quest.required_survivors):
                         print(f"Select survivor #{len(assigned_to_quest) + 1} for '{chosen_quest.name}':")
-                        for i, s in enumerate(assignable_survivors):
+                        for i, s in enumerate(temp_assignable):
                             print(f"  {i+1}. {s.name} (HP: {s.current_hp:.1f}, Stress: {s.current_stress:.1f})")
                         
                         survivor_choice_idx = input("> ").strip()
-                        if survivor_choice_idx.isdigit() and 1 <= int(survivor_choice_idx) <= len(assignable_survivors):
-                            selected_survivor = assignable_survivors.pop(int(survivor_choice_idx) - 1)
+                        if survivor_choice_idx.isdigit() and 1 <= int(survivor_choice_idx) <= len(temp_assignable):
+                            selected_survivor = temp_assignable.pop(int(survivor_choice_idx) - 1)
                             assigned_to_quest.append(selected_survivor)
                             print(f"{selected_survivor.name} assigned to {chosen_quest.name}.")
                         else:
-                            print("Invalid survivor selection. Please try again.")
-                            # Re-add survivors if selection fails
-                            assignable_survivors.extend(assigned_to_quest)
-                            assigned_to_quest = []
+                            print("Invalid survivor selection. Re-select survivors for this quest.")
+                            assigned_to_quest = [] # Clear incomplete assignment
                             break
                     
                     if assigned_to_quest:
@@ -278,7 +281,7 @@ class Game:
                     
                     survivor_choice_idx = input("> ").strip()
                     if survivor_choice_idx.isdigit() and 1 <= int(survivor_choice_idx) <= len(assignable_survivors):
-                        selected_survivor = assignable_survivors.pop(int(survivor_choice_idx) - 1)
+                        selected_survivor = assignable_survivors[int(survivor_choice_idx) - 1] # Don't pop yet, filter for next loop
                         self.assigned_actions.append({"type": "base_job", "action_obj": chosen_job, "survivors": [selected_survivor]})
                         print(f"{selected_survivor.name} assigned to {chosen_job.name}.")
                     else:
@@ -305,12 +308,13 @@ class Game:
                 travel_choice_idx = input("Enter node number to travel to: ").strip()
                 if travel_choice_idx.isdigit() and 1 <= int(travel_choice_idx) <= len(connected_nodes_list):
                     target_node_id = connected_nodes_list[int(travel_choice_idx) - 1]
-                    # Travel is handled immediately, not as an "assigned action" for the day
+                    
                     if self.travel_to_node(target_node_id):
-                        # If travel is successful, all remaining unassigned survivors are effectively "done" for the day
-                        # and no further assignments are needed.
-                        assignable_survivors = [] 
-                        print("Travel successful. Remaining survivors are at the new node.")
+                        # If travel is successful, the day effectively ends for assignments.
+                        # Any survivors not assigned before travel are now at the new node.
+                        print("Travel successful. Remaining survivors are now at the new node.")
+                        assignable_survivors = [] # Clear for next loop check
+                        break # Exit assignment loop
                     else:
                         print("Travel failed. You can re-assign actions for remaining survivors.")
                 else:
@@ -318,10 +322,11 @@ class Game:
             else:
                 print("Invalid action type choice.")
         
-        if not self.assigned_actions and self.survivors and self.get_assignable_survivors():
-            print("\nNo actions assigned for the day. Survivors will rest by default.")
-            # Optionally, automatically assign remaining to "Rest" job
-            for survivor in self.get_assignable_survivors():
+        # If any survivors remain unassigned and haven't traveled, they default to resting.
+        unassigned_at_end = self.get_assignable_survivors()
+        if unassigned_at_end:
+            print(f"\nUnassigned survivors {', '.join([s.name for s in unassigned_at_end])} will rest.")
+            for survivor in unassigned_at_end:
                 self.assigned_actions.append({"type": "base_job", "action_obj": AVAILABLE_BASE_JOBS["RestAndRecover"], "survivors": [survivor]})
 
 
@@ -329,60 +334,107 @@ class Game:
         """
         Advances the game by one day, handling daily routines and player actions.
         """
-        print(f"\n======== DAY {self.game_day} ========")
-        self.game_day += 1
+        # Ensure we have survivors to run the day
+        if not self.survivors:
+            print("No survivors left to continue the game. Game Over!")
+            return False # Indicate game over
 
+        print(f"\n======== DAY {self.game_day} ========")
+        
         # --- 1. Daily Resource Consumption (for all survivors) ---
         print("\n--- Daily Consumption ---")
         food_needed_today = len(self.survivors) * TRAVEL_FOOD_COST_PER_SURVIVOR
         water_needed_today = len(self.survivors) * TRAVEL_WATER_COST_PER_SURVIVOR
 
+        # Check and consume food
         if self.remove_resource("Food", food_needed_today):
             print(f"Consumed {food_needed_today} Food.")
         else:
-            print(f"WARNING: Not enough Food for {len(self.survivors)} survivors. Consequences (e.g., stress, health loss) will apply!")
-            # TODO: Implement consequences for food shortage (e.g., gain stress, take HP damage)
-
+            print(f"WARNING: Not enough Food for {len(self.survivors)} survivors. Applying consequences...")
+            for s in self.survivors: # All survivors suffer
+                if s.is_alive:
+                    s.gain_stress(10)
+                    s.take_damage(5)
+        
+        # Check and consume water
         if self.remove_resource("Water", water_needed_today):
             print(f"Consumed {water_needed_today} Water.")
         else:
-            print(f"WARNING: Not enough Water for {len(self.survivors)} survivors. Consequences (e.g., stress, health loss) will apply!")
-            # TODO: Implement consequences for water shortage
+            print(f"WARNING: Not enough Water for {len(self.survivors)} survivors. Applying consequences...")
+            for s in self.survivors: # All survivors suffer
+                if s.is_alive:
+                    s.gain_stress(15)
+                    s.take_damage(10)
 
         # --- NEW: Player assigns actions ---
         self.assign_actions_for_day()
 
-        # --- 3. Resolve Actions (Placeholder for later phases) ---
+        # --- 3. Resolve Actions ---
         print("\n--- Action Resolution ---")
         for action in self.assigned_actions:
-            print(f"Resolving {action['type']} for {', '.join([s.name for s in action['survivors']])} on {action['action_obj'].name}")
-            # TODO: Call specific resolution methods based on action['type']
+            action_type = action['type']
+            action_obj = action['action_obj']
+            survivors_on_action = action['survivors']
+            
+            # Quests happen at the current node's danger level. Base jobs are always at risk_level 1 (mobile base).
+            node_danger_for_resolution = self.current_node.danger_level if action_type == "quest" else 1 
+
+            was_successful, was_critical = resolve_action(
+                survivors_on_action,
+                action_obj,
+                action_type,
+                self, # Pass the game instance to allow resource modification
+                node_danger=node_danger_for_resolution
+            )
+            # TODO: Handle results like specific items, unlocks, etc.
         
         # Reset assigned actions for next day
         self.assigned_actions = []
 
-
         # --- 4. Base Events (Placeholder for later phases) ---
         print("\n--- Base Events ---")
-        if chance_check(20): # 20% chance for a random base event
+        # Base event chance can be modified by survivors on Guard Duty or node danger
+        base_event_chance = 20 # Default
+        if self.current_node:
+            base_event_chance += self.current_node.danger_level * 2 # Higher node danger, higher base event chance
+        
+        # Placeholder for guard duty modifying this chance
+        
+        if chance_check(base_event_chance):
             print("A random base event occurred! (e.g., zombie attack, new survivor, minor malfunction)")
             # TODO: Implement logic for triggering specific base events.
         else:
             print("The base remained quiet today.")
 
-        # --- 5. Update Survivor States (Placeholder for later phases) ---
+        # --- 5. Update Survivor States ---
         print("\n--- Survivor Status Update ---")
+        survivors_to_remove = []
         for survivor in self.survivors:
-            # TODO: Apply stress/HP changes based on the day's events, resolve injury/stressed flags
-            if survivor.is_alive: # Only update if alive
-                if survivor.current_stress > survivor.max_stress * 0.75 and not survivor.is_stressed:
-                    survivor.is_stressed = True
-                    print(f"{survivor.name} became stressed due to daily events.")
-                if survivor.current_hp < survivor.max_hp * 0.5 and not survivor.is_injured:
-                    survivor.is_injured = True
-                    print(f"{survivor.name} became injured due to daily events.")
+            if not survivor.is_alive:
+                print(f"{survivor.name} is deceased and will be removed from the group.")
+                survivors_to_remove.append(survivor)
+                continue # Don't process dead survivors further
             
-        print(f"Day {self.game_day-1} ends.")
+            # Re-evaluate injured/stressed flags based on current HP/Stress
+            survivor.is_injured = survivor.current_hp < survivor.max_hp * 0.5
+            survivor.is_stressed = survivor.current_stress > survivor.max_stress * 0.75
+
+            if survivor.current_hp <= 0: # Double-check for death after all resolutions
+                survivor.is_alive = False
+                survivors_to_remove.append(survivor)
+                print(f"CONFIRMED: {survivor.name} has died.")
+        
+        # Remove deceased survivors
+        for s in survivors_to_remove:
+            self.survivors.remove(s)
+
+        if not self.survivors:
+            print("\nAll survivors have perished. Game Over!")
+            return False # Indicate game over
+
+        self.game_day += 1 # Day increments only after all processing for clarity.
+        print(f"Day {self.game_day-1} ends. Now advancing to Day {self.game_day}.")
+        return True # Indicate game continues
 
 
     def display_game_state(self):
@@ -390,6 +442,8 @@ class Game:
         print("\n--- Current Game State ---")
         print(f"Game Day: {self.game_day}")
         print(f"Survivors: {len(self.survivors)}")
+        if not self.survivors:
+            print("  No survivors remain.")
         for i, survivor in enumerate(self.survivors):
             status = "Alive" if survivor.is_alive else "Deceased"
             status += ", Injured" if survivor.is_injured else ""
@@ -415,4 +469,53 @@ class Game:
         print(f"Player Vehicle: {self.player_vehicle.name if self.player_vehicle else 'None'}")
         print("--------------------------")
 
-# --- Example Us
+# --- Main Game Loop (for playing the game) ---
+def start_game_session():
+    my_game = Game(start_day=1)
+
+    print("\n--- Create your first survivor (Leader) ---")
+    leader = create_new_survivor() 
+    my_game.add_survivor(leader)
+    
+    # Add a second survivor manually for quick testing
+    print("\n--- Creating a second survivor ---")
+    survivor_ally = Survivor(name="Ally", con_val=6, san_val=8, int_val=5) 
+    survivor_ally.learn_skill("Mechanics", 1) # Give a skill for base jobs
+    survivor_ally.learn_skill("Scouting", 1) # Give a skill for quests
+    my_game.add_survivor(survivor_ally)
+
+    # Add initial resources
+    my_game.add_resource("Food", 100)
+    my_game.add_resource("Water", 100)
+    my_game.add_resource("Fuel", 50)
+    my_game.add_resource("Scrap", 50)
+    my_game.add_resource("Ammunition", 20)
+    my_game.add_resource("ElectronicParts", 20)
+
+    # Generate map and set starting node
+    my_game.generate_map(num_nodes=3)
+    if my_game.game_map:
+        first_node_id = list(my_game.game_map.keys())[0]
+        my_game.set_current_node(first_node_id)
+    
+    my_game.display_game_state()
+
+    # --- Main Game Loop ---
+    game_running = True
+    while game_running:
+        game_running = my_game.run_day()
+        if not game_running: # Game Over condition from run_day
+            print("\nGAME OVER. All survivors perished.")
+            break
+        
+        # Optional: Ask player to continue or quit after each day
+        # choice = input("Continue to next day? (y/n): ").strip().lower()
+        # if choice != 'y':
+        #     game_running = False
+        #     print("Game session ended.")
+
+    print("\n--- End of Game Session ---")
+
+
+if __name__ == "__main__":
+    start_game_session()
