@@ -1,5 +1,5 @@
 import random
-from typing import List, Dict, Any, Tuple, Union # ADDED Union
+from typing import List, Dict, Any, Tuple, Union # Make sure Union is imported here
 from survivor import Survivor
 from utils import roll_d100, chance_check # Assuming chance_check uses roll_d100
 from quests import Quest
@@ -15,7 +15,7 @@ CRITICAL_FAILURE_THRESHOLD = 5 # Roll <= 5 for critical failure
 
 def calculate_action_success_chance(
     survivors: List[Survivor],
-    action_obj: Union[Quest, BaseJob], # CHANGED
+    action_obj: Union[Quest, BaseJob], # CORRECTED TYPE HINT
     action_type: str,
     node_danger_modifier: int = 0
 ) -> float:
@@ -60,8 +60,7 @@ def calculate_action_success_chance(
 
 def resolve_action(
     survivors: List[Survivor],
-    action_obj: Quest | BaseJob,
-    action_type: str,
+    action_obj: Union[Quest, BaseJob], # CORRECTED TYPE HINT
     game_instance: Any, # We'll pass the Game object to modify resources etc.
     node_danger: int = 0
 ) -> Tuple[bool, bool]: # Returns (was_successful, was_critical)
@@ -141,6 +140,9 @@ def resolve_action(
 if __name__ == "__main__":
     from game import Game # Import Game for testing context
     from character_creator import create_new_survivor
+    from quests import AVAILABLE_QUESTS
+    from base_jobs import AVAILABLE_BASE_JOBS
+
 
     print("--- Setting up test scenario for Event Resolver ---")
     test_game = Game()
@@ -150,7 +152,7 @@ if __name__ == "__main__":
 
     # Create survivors
     survivor_a = create_new_survivor() # Use creator
-    survivor_b = Survivor(name="Brenda", str_val=6, agi_val=7, int_val=5, per_val=8, chr_val=5, con_8=8, san_val=7)
+    survivor_b = Survivor(name="Brenda", str_val=6, agi_val=7, int_val=5, per_val=8, chr_val=5, con_val=8, san_val=7) # Fixed typo con_8 to con_val=8
     survivor_b.learn_skill("Scouting", 2) # Give Brenda a skill
     survivor_b.learn_skill("Small Arms", 1)
     test_game.add_survivor(survivor_a)
