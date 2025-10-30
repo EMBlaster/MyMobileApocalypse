@@ -1,7 +1,13 @@
-import random # Needed for map generation
+import random
 from survivor import Survivor
 from utils import roll_dice, chance_check
-from map_nodes import Node, AVAILABLE_NODES # New import for Node class and definitions
+from map_nodes import Node, AVAILABLE_NODES # Import for Node class and definitions
+
+# --- Constants for Travel Costs (can be adjusted later) ---
+TRAVEL_FUEL_COST = 5
+TRAVEL_FOOD_COST_PER_SURVIVOR = 1
+TRAVEL_WATER_COST_PER_SURVIVOR = 1
+TRAVEL_VEHICLE_BREAKDOWN_CHANCE = 15 # % chance to check for breakdown (e.g., 15% means 15/100 roll)
 
 class Game:
     def __init__(self, start_day=1):
@@ -14,9 +20,9 @@ class Game:
             "Scrap": 0,
             "Ammunition": 0
         }
-        self.game_map: dict[str, Node] = {} # New: Dictionary to store the generated map (Node ID: Node object)
-        self.current_node: Node = None # Now explicitly typed as Node
-        self.player_vehicle = None # Placeholder for the player's vehicle/mobile base
+        self.game_map: dict[str, Node] = {} # Dictionary to store the generated map (Node ID: Node object)
+        self.current_node: Node = None # Current map node where the player's vehicle/base is
+        self.player_vehicle = None # Placeholder for the player's vehicle/mobile base (will be a class later)
 
         print(f"Game initialized. Day: {self.game_day}")
 
@@ -105,6 +111,65 @@ class Game:
         else:
             print(f"Error: Node '{node_id}' not found in the current map.")
 
+    def travel_to_node(self, target_node_id: str) -> bool:
+        """
+        Handles the logic for traveling from the current node to a target node.
+        Consumes resources and has a chance for travel events.
+        """
+        if not self.current_node:
+            print("Error: Cannot travel, current node is not set.")
+            return False
+
+        if target_node_id not in self.current_node.connected_nodes:
+            print(f"Error: Node '{target_node_id}' is not directly connected to {self.current_node.name}.")
+            return False
+
+        target_node = self.game_map.get(target_node_id)
+        if not target_node:
+            print(f"Error: Target node '{target_node_id}' not found in the map.")
+            return False
+
+        # --- Calculate Resource Costs ---
+        fuel_needed = TRAVEL_FUEL_COST
+        food_needed = TRAVEL_FOOD_COST_PER_SURVIVOR * len(self.survivors)
+        water_needed = TRAVEL_WATER_COST_PER_SURVIVOR * len(self.survivors)
+
+        # --- Check if resources are available ---
+        can_afford = True
+        if self.global_resources["Fuel"] < fuel_needed:
+            print(f"Not enough Fuel to travel. Need {fuel_needed}, have {self.global_resources['Fuel']}.")
+            can_afford = False
+        if self.global_resources["Food"] < food_needed:
+            print(f"Not enough Food to travel. Need {food_needed}, have {self.global_resources['Food']}.")
+            can_afford = False
+        if self.global_resources["Water"] < water_needed:
+            print(f"Not enough Water to travel. Need {water_needed}, have {self.global_resources['Water']}.")
+            can_afford = False
+        
+        if not can_afford:
+            print("Travel aborted due to insufficient resources.")
+            return False
+
+        print(f"\n--- Traveling from {self.current_node.name} to {target_node.name} ---")
+        print(f"Consuming: {fuel_needed} Fuel, {food_needed} Food, {water_needed} Water.")
+
+        # --- Consume Resources ---
+        self.remove_resource("Fuel", fuel_needed)
+        self.remove_resource("Food", food_needed)
+        self.remove_resource("Water", water_needed)
+
+        # --- Travel Events (Placeholder) ---
+        if chance_check(TRAVEL_VEHICLE_BREAKDOWN_CHANCE):
+            print("Oh no! Vehicle breakdown during travel! (This will trigger an event later)")
+            # This is where a more complex event would be triggered (e.g., skill check to repair, loss of resources, delay)
+            # For now, it just prints a message.
+
+        # --- Update Current Node ---
+        self.set_current_node(target_node_id)
+        print(f"Successfully arrived at {self.current_node.name}.")
+        return True
+
+
     def display_game_state(self):
         """Prints a summary of the current game state."""
         print("\n--- Current Game State ---")
@@ -117,19 +182,53 @@ class Game:
             print(f"  {res}: {qty}")
         print(f"Current Node: {self.current_node.name if self.current_node else 'None'}")
         if self.current_node:
-            print(f"  Connected Nodes: {', '.join(self.current_node.connected_nodes)}")
+            print(f"  Connected Nodes: {[self.game_map[node_id].name for node_id in self.current_node.connected_nodes]}")
             print(f"  Hazard: {self.current_node.hazard_type if self.current_node.hazard_type else 'None'}")
         print(f"Player Vehicle: {self.player_vehicle.name if self.player_vehicle else 'None'}")
         print("--------------------------")
 
-# --- Example Usage (for testing the Game class with map functionality) ---
+# --- Example Usage (for testing the Game class with map and navigation functionality) ---
 if __name__ == "__main__":
     print("--- Initializing Game ---")
     my_game = Game()
 
+    # Add some initial resources for travel
+    my_game.add_resource("Food", 100)
+    my_game.add_resource("Water", 100)
+    my_game.add_resource("Fuel", 50)
+    my_game.add_resource("Scrap", 50)
+
+
     print("\n--- Generating Map ---")
     my_game.generate_map(num_nodes=3) # Generate a map with 3 nodes
 
-    # Try to set the starting node
+    # Create and Add Survivors
+    survivor_alice = Survivor(name="Alice", con_val=7, san_val=6)
+    survivor_bob = Survivor(name="Bob", con_val=9, san_val=3)
+    my_game.add_survivor(survivor_alice)
+    my_game.add_survivor(survivor_bob)
+
+    # Set the starting node (always the first one in this simple generation)
     if my_game.game_map:
-        first_node_id = list(my_g
+        start_node_id = list(my_game.game_map.keys())[0]
+        my_game.set_current_node(start_node_id)
+
+    my_game.display_game_state()
+
+    print("\n--- Attempting to Travel ---")
+    if my_game.current_node and my_game.current_node.connected_nodes:
+        next_node_id = my_game.current_node.connected_nodes[0] # Pick the first connected node
+        my_game.travel_to_node(next_node_id)
+    else:
+        print("No connected nodes available for travel.")
+
+    my_game.display_game_state()
+
+    print("\n--- Attempting to Travel Again (potentially to a 3rd node) ---")
+    if my_game.current_node and my_game.current_node.connected_nodes:
+        next_node_id = my_game.current_node.connected_nodes[0] # Pick the first connected node
+        my_game.travel_to_node(next_node_id)
+    else:
+        print("No connected nodes available for travel.")
+
+    my_game.display_game_state()
