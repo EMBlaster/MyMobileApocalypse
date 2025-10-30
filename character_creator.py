@@ -54,11 +54,58 @@ def display_current_character_state(points: int, attributes: dict, selected_trai
             print(f"  - {skill_name} (Level {level})")
     print("=" * 40)
 
+def create_pregenerated_survivor() -> Survivor:
+    """
+    Creates and returns a pre-generated Survivor with a balanced spread of attributes, traits, and skills.
+    This represents a "well-rounded" survivor suitable for general gameplay.
+    """
+    # Create base survivor with balanced attributes (good middle-ground values)
+    pregenerated = Survivor(
+        name="Alex Chen",
+        str_val=5,
+        agi_val=6,
+        int_val=5,
+        per_val=6,
+        chr_val=4,
+        con_val=5,
+        san_val=5
+    )
+    
+    # Add balanced traits
+    # Adjust these based on your available traits and what works well together
+    pregenerated.add_trait("Brave")
+    pregenerated.add_trait("Strong")
+    
+    # Learn foundational skills
+    pregenerated.learn_skill("Small Arms", 1)
+    pregenerated.learn_skill("First Aid", 1)
+    pregenerated.learn_skill("Scouting", 1)
+    
+    return pregenerated
+
 
 def character_creation_menu() -> Survivor:
     """
     Main interactive menu for character creation.
+    Allows player to choose between custom creation or pre-generated character.
     """
+    clear_screen()
+    print("\n--- NEW SURVIVOR CREATION ---")
+    print("1. Create Custom Character")
+    print("2. Use Pre-Generated Character")
+    
+    initial_choice = input("> ").strip()
+    
+    if initial_choice == '2':
+        pregenerated = create_pregenerated_survivor()
+        print(f"\nLoading pre-generated survivor: {pregenerated.name}")
+        print(f"Attributes: {pregenerated.attributes}")
+        print(f"Traits: {pregenerated.traits}")
+        print(f"Skills: {pregenerated.skills}")
+        input("Press Enter to continue...")
+        return pregenerated
+    
+    # Custom character creation (original flow)
     clear_screen()
     print("\n--- NEW SURVIVOR CREATION ---")
     name = input("Enter survivor's name: ").strip()
@@ -71,7 +118,7 @@ def character_creation_menu() -> Survivor:
     selected_skills: dict[str, int] = {}
 
     while True:
-        clear_screen() # Clear at the start of each main menu loop iteration
+        clear_screen()
         print(f"\n--- Creating {name} ---")
         display_current_character_state(points_pool, current_attributes, selected_traits, selected_skills)
         
@@ -80,9 +127,10 @@ def character_creation_menu() -> Survivor:
         print("2. Edit Traits")
         print("3. Edit Skills")
         print("4. Finalize Character")
-        print("5. (Cheat: Add 100 Points - for testing)") # REMOVE FOR FINAL GAME
+        print("5. (Cheat: Add 100 Points - for testing)")
         
         choice = input("> ").strip()
+
 
         if choice == '1': # Edit Attributes
             while True:
@@ -232,18 +280,13 @@ def character_creation_menu() -> Survivor:
         elif choice == '4': # Finalize Character
             print("\n--- FINALIZING CHARACTER ---")
             break
-        
-        elif choice == '5': # Cheat for testing (REMOVE FOR FINAL GAME)
+        elif choice == '5':
             points_pool += 100
             print("100 points added for testing purposes!")
             input("Press Enter to continue...")
-            # clear_screen() # No need to clear here, main loop will clear
-        
         else:
             print("Invalid option.")
             input("Press Enter to continue...")
-            # clear_screen() # No need to clear here, main loop will clear
-
 
     # --- Construct Final Survivor Object ---
     final_survivor = Survivor(
@@ -257,19 +300,20 @@ def character_creation_menu() -> Survivor:
         san_val=current_attributes["SAN"]
     )
 
-    for trait_obj in selected_traits: # Iterate through Trait objects
-        final_survivor.add_trait(trait_obj.name) # Add trait name to survivor
+    for trait_obj in selected_traits:
+        final_survivor.add_trait(trait_obj.name)
 
     for skill_name, level in selected_skills.items():
-        final_survivor.learn_skill(skill_name, level) # Add skill to survivor
+        final_survivor.learn_skill(skill_name, level)
 
     print(f"\nSurvivor '{final_survivor.name}' has been created!")
     print(f"Final Attributes: {final_survivor.attributes}")
-    print(f"Final Traits: {[t.name for t in selected_traits]}") # Display names, not objects
+    print(f"Final Traits: {[t.name for t in selected_traits]}")
     print(f"Final Skills: {final_survivor.skills}")
     print(f"Remaining points: {points_pool}")
 
     return final_survivor
+
 
 # --- Example Usage (for testing the character creator) ---
 if __name__ == "__main__":
