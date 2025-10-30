@@ -2,6 +2,7 @@ import random
 from survivor import Survivor
 from utils import roll_dice, chance_check
 from map_nodes import Node, AVAILABLE_NODES # Import for Node class and definitions
+from character_creator import create_new_survivor # Import for testing character creation
 
 # --- Constants for Travel Costs (can be adjusted later) ---
 TRAVEL_FUEL_COST = 5
@@ -98,6 +99,7 @@ class Game:
             self.game_map[second_node_ids].connected_nodes.append(selected_node_ids[0])
             print(f"  Ensured connection between first two nodes: {selected_node_ids[0]} <--> {second_node_id}")
 
+
         print("Map generation complete.")
         if self.game_map:
             print(f"Generated Map Nodes: {[node.id for node in self.game_map.values()]}")
@@ -169,6 +171,64 @@ class Game:
         print(f"Successfully arrived at {self.current_node.name}.")
         return True
 
+    def run_day(self):
+        """
+        Advances the game by one day, handling daily routines and player actions.
+        """
+        print(f"\n======== DAY {self.game_day} ========")
+        self.game_day += 1
+
+        # --- 1. Daily Resource Consumption (for all survivors) ---
+        print("\n--- Daily Consumption ---")
+        food_needed_today = len(self.survivors) * TRAVEL_FOOD_COST_PER_SURVIVOR # Using same constant for simplicity
+        water_needed_today = len(self.survivors) * TRAVEL_WATER_COST_PER_SURVIVOR # Using same constant for simplicity
+
+        # Check and consume food
+        if self.remove_resource("Food", food_needed_today):
+            print(f"Consumed {food_needed_today} Food.")
+        else:
+            print(f"WARNING: Not enough Food for {len(self.survivors)} survivors. Consequences (e.g., stress, health loss) will apply!")
+            # TODO: Implement consequences for food/water shortage
+
+        # Check and consume water
+        if self.remove_resource("Water", water_needed_today):
+            print(f"Consumed {water_needed_today} Water.")
+        else:
+            print(f"WARNING: Not enough Water for {len(self.survivors)} survivors. Consequences (e.g., stress, health loss) will apply!")
+            # TODO: Implement consequences for food/water shortage
+
+        # --- 2. Player Actions (Placeholder for later phases) ---
+        print("\n--- Player Actions ---")
+        print("What will the survivors do today?")
+        print(" (Options for Quests, Base Jobs, or Travel will appear here.)")
+        # TODO: Implement player input for choosing actions.
+
+        # --- 3. Resolve Actions (Placeholder for later phases) ---
+        print("\n--- Action Resolution ---")
+        print(" (Assigned quests/base jobs will resolve here.)")
+        # TODO: Call resolution methods for quests, base jobs.
+
+        # --- 4. Base Events (Placeholder for later phases) ---
+        print("\n--- Base Events ---")
+        if chance_check(20): # 20% chance for a random base event
+            print("A random base event occurred! (e.g., zombie attack, new survivor, minor malfunction)")
+            # TODO: Implement logic for triggering specific base events.
+        else:
+            print("The base remained quiet today.")
+
+        # --- 5. Update Survivor States (Placeholder for later phases) ---
+        print("\n--- Survivor Status Update ---")
+        for survivor in self.survivors:
+            # TODO: Apply stress/HP changes based on the day's events, resolve injury/stressed flags
+            if survivor.current_stress > survivor.max_stress * 0.75 and not survivor.is_stressed:
+                survivor.is_stressed = True
+                print(f"{survivor.name} became stressed due to daily events.")
+            if survivor.current_hp < survivor.max_hp * 0.5 and not survivor.is_injured:
+                survivor.is_injured = True
+                print(f"{survivor.name} became injured due to daily events.")
+            
+        print(f"Day {self.game_day-1} ends.")
+
 
     def display_game_state(self):
         """Prints a summary of the current game state."""
@@ -182,53 +242,48 @@ class Game:
             print(f"  {res}: {qty}")
         print(f"Current Node: {self.current_node.name if self.current_node else 'None'}")
         if self.current_node:
-            print(f"  Connected Nodes: {[self.game_map[node_id].name for node_id in self.current_node.connected_nodes]}")
+            connected_node_names = [self.game_map[node_id].name for node_id in self.current_node.connected_nodes if node_id in self.game_map]
+            print(f"  Connected Nodes: {', '.join(connected_node_names)}")
             print(f"  Hazard: {self.current_node.hazard_type if self.current_node.hazard_type else 'None'}")
         print(f"Player Vehicle: {self.player_vehicle.name if self.player_vehicle else 'None'}")
         print("--------------------------")
 
-# --- Example Usage (for testing the Game class with map and navigation functionality) ---
+# --- Example Usage (for testing the Game class with daily loop) ---
 if __name__ == "__main__":
-    print("--- Initializing Game ---")
-    my_game = Game()
+    print("--- Starting New Game Scenario ---")
+    my_game = Game(start_day=1)
 
-    # Add some initial resources for travel
+    # Create and add a few survivors
+    survivor_alpha = create_new_survivor() # Use the character creator
+    survivor_beta = Survivor(name="Beta", con_val=6, san_val=8) # Manual creation for quick testing
+    my_game.add_survivor(survivor_alpha)
+    my_game.add_survivor(survivor_beta)
+
+    # Add initial resources
     my_game.add_resource("Food", 100)
     my_game.add_resource("Water", 100)
     my_game.add_resource("Fuel", 50)
     my_game.add_resource("Scrap", 50)
 
-
-    print("\n--- Generating Map ---")
-    my_game.generate_map(num_nodes=3) # Generate a map with 3 nodes
-
-    # Create and Add Survivors
-    survivor_alice = Survivor(name="Alice", con_val=7, san_val=6)
-    survivor_bob = Survivor(name="Bob", con_val=9, san_val=3)
-    my_game.add_survivor(survivor_alice)
-    my_game.add_survivor(survivor_bob)
-
-    # Set the starting node (always the first one in this simple generation)
+    # Generate map and set starting node
+    my_game.generate_map(num_nodes=3)
     if my_game.game_map:
-        start_node_id = list(my_game.game_map.keys())[0]
-        my_game.set_current_node(start_node_id)
-
+        first_node_id = list(my_game.game_map.keys())[0]
+        my_game.set_current_node(first_node_id)
+    
     my_game.display_game_state()
 
-    print("\n--- Attempting to Travel ---")
-    if my_game.current_node and my_game.current_node.connected_nodes:
-        next_node_id = my_game.current_node.connected_nodes[0] # Pick the first connected node
-        my_game.travel_to_node(next_node_id)
-    else:
-        print("No connected nodes available for travel.")
-
+    print("\n--- Running Day 1 ---")
+    my_game.run_day()
     my_game.display_game_state()
 
-    print("\n--- Attempting to Travel Again (potentially to a 3rd node) ---")
-    if my_game.current_node and my_game.current_node.connected_nodes:
-        next_node_id = my_game.current_node.connected_nodes[0] # Pick the first connected node
-        my_game.travel_to_node(next_node_id)
-    else:
-        print("No connected nodes available for travel.")
+    print("\n--- Running Day 2 ---")
+    my_game.run_day()
+    my_game.display_game_state()
 
+    print("\n--- Running Day 3 (with potential resource shortage) ---")
+    # Manually drain resources to test shortage warnings
+    my_game.remove_resource("Food", 90) 
+    my_game.remove_resource("Water", 90)
+    my_game.run_day()
     my_game.display_game_state()
