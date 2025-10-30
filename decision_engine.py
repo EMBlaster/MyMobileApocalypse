@@ -2,6 +2,8 @@ from typing import List, Dict, Any, Tuple
 from survivor import Survivor
 from utils import roll_d100, chance_check # Need chance_check, might need roll_d100 directly
 from skills import AVAILABLE_SKILLS # To potentially check skill levels for prerequisites/bonuses
+from event_resolver import CRITICAL_SUCCESS_THRESHOLD, CRITICAL_FAILURE_THRESHOLD
+
 
 class Choice:
     """

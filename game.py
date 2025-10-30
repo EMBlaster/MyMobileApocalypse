@@ -6,7 +6,9 @@ from character_creator import create_new_survivor
 from quests import Quest, AVAILABLE_QUESTS
 from base_jobs import BaseJob, AVAILABLE_BASE_JOBS
 from event_resolver import resolve_action
-from decision_engine import make_decision, Choice # NEW IMPORT for decision engine
+from decision_engine import make_decision, Choice
+from zombies import Zombie, AVAILABLE_ZOMBIES # NEW IMPORT: For spawning zombies
+from combat_engine import resolve_combat # NEW IMPORT: For combat encounters
 
 # --- Constants for Travel Costs (can be adjusted later) ---
 TRAVEL_FUEL_COST = 5
@@ -196,7 +198,7 @@ class Game:
         """
         Allows the player to assign survivors to quests or base jobs.
         """
-        self.assigned_actions = [] # Reset assignments for the new day
+        self.assigned_actions = []
         
         print("\n--- Assign Actions for Today ---")
         while True:
@@ -205,13 +207,13 @@ class Game:
                 print("\nAll active survivors have been assigned an action or are resting.")
                 break
 
-            self.display_game_state() # Show current state, especially available survivors
+            self.display_game_state()
             print(f"\nSurvivors still needing assignments: {[s.name for s in assignable_survivors]}")
             
             print("\nChoose an action type (or 'done' to finish assignments):")
             print("1. Assign to Quest")
             print("2. Assign to Base Job")
-            print("3. Travel to New Node") # Travel is also a daily action
+            print("3. Travel to New Node")
             action_type_choice = input("> ").strip().lower()
 
             if action_type_choice == 'done':
@@ -238,7 +240,7 @@ class Game:
 
                     print(f"Assigning survivors to: {chosen_quest.name}")
                     assigned_to_quest = []
-                    temp_assignable = list(assignable_survivors) # Make a temp copy to select from
+                    temp_assignable = list(assignable_survivors)
                     for _ in range(chosen_quest.required_survivors):
                         print(f"Select survivor #{len(assigned_to_quest) + 1} for '{chosen_quest.name}':")
                         for i, s in enumerate(temp_assignable):
@@ -251,7 +253,7 @@ class Game:
                             print(f"{selected_survivor.name} assigned to {chosen_quest.name}.")
                         else:
                             print("Invalid survivor selection. Re-select survivors for this quest.")
-                            assigned_to_quest = [] # Clear incomplete assignment
+                            assigned_to_quest = []
                             break
                     
                     if assigned_to_quest:
@@ -327,7 +329,7 @@ class Game:
                 self.assigned_actions.append({"type": "base_job", "action_obj": AVAILABLE_BASE_JOBS["RestAndRecover"], "survivors": [survivor]})
 
 
-    def run_day(self) -> bool: # Added return type hint for clarity
+    def run_day(self) -> bool:
         """
         Advances the game by one day, handling daily routines and player actions.
         Returns False if game is over, True otherwise.
@@ -373,54 +375,137 @@ class Game:
             
             node_danger_for_resolution = self.current_node.danger_level if action_type == "quest" else 1 
 
-            was_successful, was_critical = resolve_action(
-                survivors_on_action,
-                action_obj,
-                action_type,
-                self, # Pass the game instance
-                node_danger=node_danger_for_resolution
-            )
-            # Example: Integrate a decision point based on a quest outcome
-            if action_type == "quest" and action_obj.id == "ClearInfestation" and was_successful:
-                print("\n--- Decision: After Clearing Infestation ---")
-                post_clear_choices = [
-                    Choice(
-                        text="Scavenge Deeper",
-                        description="Risk more time for potentially richer loot.",
-                        base_success_chance=60,
-                        effects_on_success={"resource_gain": {"Scrap": 30, "Ammunition": 10}},
-                        effects_on_failure={"stress_gain_per_survivor": 15, "hp_loss_per_survivor": 5},
-                        known_consequences_text="High risk, good rewards. More stress."
-                    ),
-                    Choice(
-                        text="Secure and Leave",
-                        description="Take what's obvious and move on, minimizing risk.",
-                        base_success_chance=95,
-                        effects_on_success={"resource_gain": {"Scrap": 10}},
-                        effects_on_failure={},
-                        known_consequences_text="Low risk, modest reward."
-                    )
+            # NEW: Handle specific combat quests here
+            if action_type == "quest" and action_obj.id == "ClearInfestation":
+                print(f"\n--- Combat for Quest: {action_obj.name} ---")
+                # Hardcoded zombie horde for ClearInfestation for now
+                zombie_horde_for_quest = [
+                    Zombie(**AVAILABLE_ZOMBIES["shambler"].__dict__),
+                    Zombie(**AVAILABLE_ZOMBIES["shambler"].__dict__),
+                    Zombie(**AVAILABLE_ZOMBIES["charger"].__dict__),
                 ]
-                # Assuming the primary survivor of the quest makes the decision
-                if survivors_on_action:
-                    outcome, effects = make_decision(
-                        prompt=f"You successfully cleared the infestation at {action_obj.name}. What now?",
-                        choices=post_clear_choices,
-                        game_instance=self,
-                        affected_survivors=survivors_on_action,
-                        node_danger=self.current_node.danger_level
-                    )
-                    # Apply effects from the decision
-                    if "resource_gain" in effects:
-                        for res, qty in effects["resource_gain"].items():
+                # Ensure unique IDs for instances
+                zombie_horde_for_quest[0].id = "shambler_q1_1"
+                zombie_horde_for_quest[1].id = "shambler_q1_2"
+                zombie_horde_for_quest[2].id = "charger_q1_1"
+
+                combat_results = resolve_combat(
+                    survivors=survivors_on_action,
+                    zombies=zombie_horde_for_quest,
+                    game_instance=self,
+                    environment_mods={}, # No specific env mods for this quest for now
+                    node_danger=self.current_node.danger_level
+                )
+
+                if combat_results["victory"]:
+                    print(f"Quest '{action_obj.name}' combat was a VICTORY!")
+                    # Apply quest rewards after successful combat
+                    # Using resolve_action's reward logic (simplified for now)
+                    for res, qty in action_obj.rewards.items():
+                        if res == "Experience":
+                            for s in survivors_on_action:
+                                print(f"{s.name} gained {qty} Experience from quest.")
+                        else:
                             self.add_resource(res, qty)
-                    if "hp_loss_per_survivor" in effects:
-                        for s in survivors_on_action:
-                            s.take_damage(effects["hp_loss_per_survivor"])
-                    if "stress_gain_per_survivor" in effects:
-                        for s in survivors_on_action:
-                            s.gain_stress(effects["stress_gain_per_survivor"])
-                    print(f"Decision result: {outcome}. Effects applied.")
+                    print(f"  Quest rewards received: {action_obj.rewards}")
+                    
+                    # Post-combat decision (reusing existing decision logic)
+                    print("\n--- Decision: After Clearing Infestation ---")
+                    post_clear_choices = [
+                        Choice(
+                            text="Scavenge Deeper",
+                            description="Risk more time for potentially richer loot.",
+                            base_success_chance=60,
+                            effects_on_success={"resource_gain": {"Scrap": 30, "Ammunition": 10}},
+                            effects_on_failure={"stress_gain_per_survivor": 15, "hp_loss_per_survivor": 5},
+                            known_consequences_text="High risk, good rewards. More stress."
+                        ),
+                        Choice(
+                            text="Secure and Leave",
+                            description="Take what's obvious and move on, minimizing risk.",
+                            base_success_chance=95,
+                            effects_on_success={"resource_gain": {"Scrap": 10}},
+                            effects_on_failure={},
+                            known_consequences_text="Low risk, modest reward."
+                        )
+                    ]
+                    decision_maker = survivors_on_action[0] if survivors_on_action else None
+                    if decision_maker:
+                        outcome, effects = make_decision(
+                            prompt=f"You successfully cleared the infestation at {action_obj.name}. What now?",
+                            choices=post_clear_choices,
+                            game_instance=self,
+                            affected_survivors=survivors_on_action,
+                            node_danger=self.current_node.danger_level
+                        )
+                        if "resource_gain" in effects:
+                            for res, qty in effects["resource_gain"].items():
+                                self.add_resource(res, qty)
+                        if "hp_loss_per_survivor" in effects:
+                            for s in survivors_on_action:
+                                s.take_damage(effects["hp_loss_per_survivor"])
+                        if "stress_gain_per_survivor" in effects:
+                            for s in survivors_on_action:
+                                s.gain_stress(effects["stress_gain_per_survivor"])
+                        print(f"Decision result: {outcome}. Effects applied.")
+
+                else:
+                    print(f"Quest '{action_obj.name}' combat was a DEFEAT or STALEMATE.")
+                    # Apply quest failure consequences (simplified)
+                    for s in survivors_on_action:
+                        s.gain_stress(action_obj.fail_consequences.get("Stress_gain_per_survivor", 0) * 2) # Double stress for combat defeat
+                        s.take_damage(action_obj.fail_consequences.get("HP_loss_per_survivor", 0) * 2) # Double damage for combat defeat
+                    print(f"  Severe consequences applied for combat failure.")
+
+            else: # For non-combat quests and all base jobs, use generic resolve_action
+                was_successful, was_critical = resolve_action(
+                    survivors_on_action,
+                    action_obj,
+                    action_type,
+                    self, # Pass the game instance
+                    node_danger_for_resolution
+                )
+                # For non-combat quest decisions or post-resolution decisions
+                if action_type == "quest" and action_obj.id == "FindMissingTrader" and was_successful:
+                     # Example: Integrate a decision point based on a different quest outcome
+                    print("\n--- Decision: Found Trader's Log ---")
+                    trader_log_choices = [
+                        Choice(
+                            text="Decrypt Data",
+                            description="Try to access encrypted information, potentially revealing valuable locations.",
+                            base_success_chance=75,
+                            effects_on_success={"resource_gain": {"DataChips": 1}, "unlocks_new_quest": "FindHiddenStash"},
+                            effects_on_failure={"stress_gain_per_survivor": 10},
+                            prerequisites={"skill": {"Electronics": 1}, "attribute": {"INT": 5}},
+                            known_consequences_text="Requires Electronics/INT. May unlock new quests."
+                        ),
+                        Choice(
+                            text="Discard Log",
+                            description="It's too risky or complex. Dispose of the log and move on.",
+                            base_success_chance=99,
+                            effects_on_success={"info": "Log discarded. No further risk."},
+                            effects_on_failure={"stress_gain_per_survivor": 5},
+                            known_consequences_text="Safe choice. No additional rewards."
+                        )
+                    ]
+                    decision_maker = survivors_on_action[0] if survivors_on_action else None
+                    if decision_maker:
+                        outcome, effects = make_decision(
+                            prompt=f"You found a data log belonging to the missing trader. What do you do?",
+                            choices=trader_log_choices,
+                            game_instance=self,
+                            affected_survivors=survivors_on_action,
+                            node_danger=self.current_node.danger_level
+                        )
+                        if "resource_gain" in effects:
+                            for res, qty in effects["resource_gain"].items():
+                                self.add_resource(res, qty)
+                        if "stress_gain_per_survivor" in effects:
+                            for s in survivors_on_action:
+                                s.gain_stress(effects["stress_gain_per_survivor"])
+                        if "unlocks_new_quest" in effects:
+                            print(f"  New quest unlocked: {effects['unlocks_new_quest']} (Not yet implemented to add to node).")
+                        print(f"Decision result: {outcome}. Effects applied.")
 
 
         self.assigned_actions = []
@@ -433,8 +518,7 @@ class Game:
         
         if chance_check(base_event_chance):
             print("A random base event occurred!")
-            # Example: A simple decision point for a base event
-            if chance_check(50): # 50% chance for this specific base event decision
+            if chance_check(50):
                 print("\n--- Decision: Unexpected Visitor ---")
                 visitor_choices = [
                     Choice(
@@ -454,7 +538,6 @@ class Game:
                         known_consequences_text="Safe, but no new survivor."
                     )
                 ]
-                # Decision made by the leader (first survivor in list) or a random one
                 decision_maker = self.survivors[0] if self.survivors else None
                 if decision_maker:
                     outcome, effects = make_decision(
@@ -464,20 +547,19 @@ class Game:
                         affected_survivors=[decision_maker],
                         node_danger=self.current_node.danger_level if self.current_node else 1
                     )
-                    # Apply effects from the decision
                     if "recruit_survivor" in effects and effects["recruit_survivor"]:
-                        new_recruit = create_new_survivor() # Create a basic new survivor
+                        new_recruit = create_new_survivor()
                         self.add_survivor(new_recruit)
                         print(f"A new survivor, {new_recruit.name}, joined your group!")
                     if "resource_loss" in effects:
                         for res, qty in effects["resource_loss"].items():
                             self.remove_resource(res, qty)
                     if "stress_gain_per_survivor" in effects:
-                        for s in [decision_maker]: # Only decision maker gains stress for now
+                        for s in [decision_maker]:
                             s.gain_stress(effects["stress_gain_per_survivor"])
                     print(f"Decision result: {outcome}. Effects applied.")
             else:
-                print("A minor malfunction occurred at the base. (No decision needed)") # Default random event
+                print("A minor malfunction occurred at the base. (No decision needed)")
         else:
             print("The base remained quiet today.")
 
@@ -554,6 +636,7 @@ def start_game_session():
     survivor_ally = Survivor(name="Ally", con_val=6, san_val=8, int_val=5) 
     survivor_ally.learn_skill("Mechanics", 1)
     survivor_ally.learn_skill("Scouting", 1)
+    survivor_ally.learn_skill("Small Arms", 1) # Give a combat skill
     my_game.add_survivor(survivor_ally)
 
     my_game.add_resource("Food", 100)
@@ -577,7 +660,7 @@ def start_game_session():
             print("\nGAME OVER. All survivors perished.")
             break
         
-        input("\nPress Enter to continue to the next day...") # Added to pause between days
+        input("\nPress Enter to continue to the next day...")
 
     print("\n--- End of Game Session ---")
 

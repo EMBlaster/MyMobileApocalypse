@@ -1,5 +1,5 @@
 import random
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Union # Make sure Union is imported here
 from survivor import Survivor
 from zombies import Zombie, AVAILABLE_ZOMBIES # Import Zombie class and predefined types
 from utils import roll_dice, chance_check
@@ -13,7 +13,7 @@ SURVIVOR_MELEE_DAMAGE_MULTIPLIER = 5 # Base damage multiplier for STR in melee
 SURVIVOR_RANGED_DAMAGE_MULTIPLIER = 4 # Base damage multiplier for AGI in ranged
 ZOMBIE_HP_PER_DANGER_LEVEL = 10 # Zombies gain HP based on node danger
 
-def get_combat_stats(entity: Survivor | Zombie) -> dict:
+def get_combat_stats(entity: Union[Survivor, Zombie]) -> dict:
     """Helper to get relevant combat stats for an entity."""
     if isinstance(entity, Survivor):
         return {
@@ -221,18 +221,27 @@ if __name__ == "__main__":
     survivor_shooter.add_trait("Brave") # Not used yet, but for future
     test_game.add_survivor(survivor_shooter)
 
-    # Create a horde of zombies (create fresh instances)
-    zombie_horde = [
-        Zombie(**AVAILABLE_ZOMBIES["shambler"].__dict__), # Copies all attributes
-        Zombie(**AVAILABLE_ZOMBIES["shambler"].__dict__),
-        Zombie(**AVAILABLE_ZOMBIES["charger"].__dict__),
-        Zombie(**AVAILABLE_ZOMBIES["screamer"].__dict__),
-    ]
-    # Ensure IDs are unique for instances, if needed later for tracking
-    zombie_horde[0].id = "shambler_1"
-    zombie_horde[1].id = "shambler_2"
-    zombie_horde[2].id = "charger_1"
-    zombie_horde[3].id = "screamer_1"
+    # Create a horde of zombies (create fresh instances by extracting relevant attributes)
+    zombie_horde = []
+    
+    # Helper to create a fresh zombie instance from the AVAILABLE_ZOMBIES blueprint
+    def create_fresh_zombie_instance(zombie_type_id: str, instance_id: str):
+        blueprint = AVAILABLE_ZOMBIES[zombie_type_id]
+        return Zombie(
+            id=instance_id,
+            name=blueprint.name,
+            description=blueprint.description,
+            base_hp=blueprint.base_hp,
+            damage=blueprint.damage,
+            speed=blueprint.speed,
+            defense=blueprint.defense,
+            traits=list(blueprint.traits) # Copy traits list
+        )
+
+    zombie_horde.append(create_fresh_zombie_instance("shambler", "shambler_instance_1"))
+    zombie_horde.append(create_fresh_zombie_instance("shambler", "shambler_instance_2"))
+    zombie_horde.append(create_fresh_zombie_instance("charger", "charger_instance_1"))
+    zombie_horde.append(create_fresh_zombie_instance("screamer", "screamer_instance_1"))
 
 
     # Run Combat
