@@ -118,5 +118,33 @@ def resolve_action(
     return is_successful, is_critical_success
 
 if __name__ == "__main__":
-    # ... (Test code remains the same, omitted for brevity but safe to keep your old one if you want)
-    pass
+    # Quick demo / smoke-run for local manual testing.
+    # Creates a single survivor and resolves a simple base job to show expected prints.
+    class DummyAction:
+        def __init__(self, name, recommended_skills=None, rewards=None, fail_consequences=None):
+            self.name = name
+            self.recommended_skills = recommended_skills if recommended_skills is not None else {}
+            self.rewards = rewards if rewards is not None else {}
+            self.fail_consequences = fail_consequences if fail_consequences is not None else {}
+
+    class MockGame:
+        def __init__(self):
+            self.resources = {}
+
+        def add_resource(self, name, qty):
+            self.resources[name] = self.resources.get(name, 0) + qty
+            print(f"MockGame: added {qty} x {name}. Total now: {self.resources[name]}")
+
+    print("--- event_resolver demo ---")
+    tester = Survivor(name="Demo", str_val=5, agi_val=5, int_val=6, per_val=4, chr_val=3, con_val=5, san_val=4)
+    tester.learn_skill("Mechanics", 2)
+
+    demo_action = DummyAction(
+        name="RepairGenerator",
+        recommended_skills={"Mechanics": 1},
+        rewards={"Scrap": 15},
+        fail_consequences={"HP_loss_per_survivor": 5, "Stress_gain_per_survivor": 10}
+    )
+
+    game = MockGame()
+    resolve_action([tester], demo_action, "base_job", game, node_danger=0)
