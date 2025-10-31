@@ -469,15 +469,41 @@ class Game:
             if action_type == "quest" and action_obj.id == "ClearInfestation":
                 print(f"\n--- Combat for Quest: {action_obj.name} ---")
                 # Hardcoded zombie horde for ClearInfestation for now
+                # Build fresh Zombie instances using constructor parameters only
+                shambler_proto = AVAILABLE_ZOMBIES["shambler"]
+                charger_proto = AVAILABLE_ZOMBIES["charger"]
                 zombie_horde_for_quest = [
-                    Zombie(**AVAILABLE_ZOMBIES["shambler"].__dict__),
-                    Zombie(**AVAILABLE_ZOMBIES["shambler"].__dict__),
-                    Zombie(**AVAILABLE_ZOMBIES["charger"].__dict__),
+                    Zombie(
+                        id="shambler_q1_1",
+                        name=shambler_proto.name,
+                        description=shambler_proto.description,
+                        base_hp=shambler_proto.base_hp,
+                        damage=shambler_proto.damage,
+                        speed=shambler_proto.speed,
+                        defense=shambler_proto.defense,
+                        traits=list(shambler_proto.traits),
+                    ),
+                    Zombie(
+                        id="shambler_q1_2",
+                        name=shambler_proto.name,
+                        description=shambler_proto.description,
+                        base_hp=shambler_proto.base_hp,
+                        damage=shambler_proto.damage,
+                        speed=shambler_proto.speed,
+                        defense=shambler_proto.defense,
+                        traits=list(shambler_proto.traits),
+                    ),
+                    Zombie(
+                        id="charger_q1_1",
+                        name=charger_proto.name,
+                        description=charger_proto.description,
+                        base_hp=charger_proto.base_hp,
+                        damage=charger_proto.damage,
+                        speed=charger_proto.speed,
+                        defense=charger_proto.defense,
+                        traits=list(charger_proto.traits),
+                    ),
                 ]
-                # Ensure unique IDs for instances
-                zombie_horde_for_quest[0].id = "shambler_q1_1"
-                zombie_horde_for_quest[1].id = "shambler_q1_2"
-                zombie_horde_for_quest[2].id = "charger_q1_1"
 
                 combat_results = resolve_combat(
                     survivors=survivors_on_action,
@@ -728,6 +754,18 @@ def start_game_session():
         if idx + 1 < len(sys.argv):
             load_path = sys.argv[idx + 1]
 
+    # Headless mode: allow non-interactive playtests or automated runs
+    headless = "--headless" in sys.argv
+    # Allow a `--days N` flag to limit headless runs
+    days_to_run = None
+    if "--days" in sys.argv:
+        try:
+            idx = sys.argv.index("--days")
+            if idx + 1 < len(sys.argv):
+                days_to_run = int(sys.argv[idx + 1])
+        except Exception:
+            days_to_run = None
+
     if load_path:
         try:
             my_game = Game.load_from_file(load_path)
@@ -739,39 +777,129 @@ def start_game_session():
     else:
         my_game = Game(start_day=1)
 
-        print("\n--- Create your first survivor (Leader) ---")
-        # Import character creation lazily so modules that import Game (e.g. tests) don't require character_creator
-        from character_creator import create_new_survivor
-        leader = create_new_survivor()
-        my_game.add_survivor(leader)
-        
-        print("\n--- Creating a second survivor ---")
-        survivor_ally = Survivor(name="Ally", con_val=6, san_val=8, int_val=5) 
-        survivor_ally.learn_skill("Mechanics", 1)
-        survivor_ally.learn_skill("Scouting", 1)
-        survivor_ally.learn_skill("Small Arms", 1) # Give a combat skill
-        my_game.add_survivor(survivor_ally)
+        if headless:
+            # Use HeadlessIO and pregenerated survivors for automated runs
+            from io_handler import HeadlessIO
+            from character_creator import create_pregenerated_survivor
 
-        my_game.add_resource("Food", 100)
-        my_game.add_resource("Water", 100)
-        my_game.add_resource("Fuel", 50)
-        my_game.add_resource("Scrap", 50)
-        my_game.add_resource("Ammunition", 20)
-        my_game.add_resource("ElectronicParts", 20)
+            my_game.io = HeadlessIO(responses=["1"] * 200)
 
-        my_game.generate_map(num_nodes=3)
-        if my_game.game_map:
-            first_node_id = list(my_game.game_map.keys())[0]
-            my_game.set_current_node(first_node_id)
-        
-        my_game.display_game_state()
+            # Create a small starter party
+            leader = create_pregenerated_survivor()
+            # Add two more simple survivors
+            ally = Survivor(name="Ally", con_val=6, san_val=8, int_val=5)
+            ally.learn_skill("Mechanics", 1)
+            ally.learn_skill("Small Arms", 1)
+            friend = Survivor(name="Sam", con_val=5, san_val=5, int_val=4)
+
+            my_game.add_survivor(leader)
+            my_game.add_survivor(ally)
+            my_game.add_survivor(friend)
+
+            # Give some starting resources suitable for short automated runs
+            my_game.add_resource("Food", 50)
+            my_game.add_resource("Water", 50)
+            my_game.add_resource("Fuel", 30)
+            my_game.add_resource("Scrap", 30)
+            my_game.add_resource("Ammunition", 20)
+            my_game.add_resource("ElectronicParts", 10)
+
+            my_game.generate_map(num_nodes=3)
+            if my_game.game_map:
+                first_node_id = list(my_game.game_map.keys())[0]
+                my_game.set_current_node(first_node_id)
+
+            my_game.display_game_state()
+            # Provide a simple auto-assign function for headless runs to avoid interactive prompts
+            def _headless_auto_assign():
+                my_game.assigned_actions = []
+                from base_jobs import AVAILABLE_BASE_JOBS
+                # Alternate between ScrapSalvage and RestAndRecover for variety
+                job_ids = ["ScrapSalvage", "RestAndRecover"]
+                survivors = my_game.get_assignable_survivors()
+                for i, s in enumerate(survivors):
+                    jid = job_ids[i % len(job_ids)]
+                    job = AVAILABLE_BASE_JOBS.get(jid)
+                    if job:
+                        my_game.assigned_actions.append({"type": "base_job", "action_obj": job, "survivors": [s]})
+
+            my_game.assign_actions_for_day = _headless_auto_assign
+            # Monkeypatch the decision engine to auto-select the best choice in headless mode
+            try:
+                import decision_engine as _de
+                _orig_decision = getattr(_de, 'make_decision', None)
+
+                def _auto_make_decision(prompt, choices, game_instance, affected_survivors=None, node_danger=0, io_handler=None):
+                    # Choose the available choice with highest calculated chance
+                    if affected_survivors is None:
+                        affected_survivors = []
+                    available = []
+                    for c in choices:
+                        try:
+                            chance = _de.calculate_choice_specific_chance(c, affected_survivors, game_instance)
+                        except Exception:
+                            chance = getattr(c, 'base_success_chance', 50)
+                        available.append((c, chance))
+                    if not available:
+                        return 'failure', {'info': 'no viable choices (headless)'}
+                    available.sort(key=lambda x: x[1], reverse=True)
+                    chosen, _chance = available[0]
+                    # Report choice to IO
+                    io = io_handler or getattr(game_instance, 'io', None)
+                    if io:
+                        io.print(f"Auto-choice (headless): '{chosen.text}'")
+                    # Deterministically treat as success and return success effects
+                    return 'success', chosen.effects_on_success
+
+                _de.make_decision = _auto_make_decision
+                # Also override the local name used in this module
+                globals()['make_decision'] = _de.make_decision
+            except Exception:
+                pass
+        else:
+            print("\n--- Create your first survivor (Leader) ---")
+            # Import character creation lazily so modules that import Game (e.g. tests) don't require character_creator
+            from character_creator import create_new_survivor
+            leader = create_new_survivor()
+            my_game.add_survivor(leader)
+            
+            print("\n--- Creating a second survivor ---")
+            survivor_ally = Survivor(name="Ally", con_val=6, san_val=8, int_val=5) 
+            survivor_ally.learn_skill("Mechanics", 1)
+            survivor_ally.learn_skill("Scouting", 1)
+            survivor_ally.learn_skill("Small Arms", 1) # Give a combat skill
+            my_game.add_survivor(survivor_ally)
+
+            my_game.add_resource("Food", 100)
+            my_game.add_resource("Water", 100)
+            my_game.add_resource("Fuel", 50)
+            my_game.add_resource("Scrap", 50)
+            my_game.add_resource("Ammunition", 20)
+            my_game.add_resource("ElectronicParts", 20)
+
+            my_game.generate_map(num_nodes=3)
+            if my_game.game_map:
+                first_node_id = list(my_game.game_map.keys())[0]
+                my_game.set_current_node(first_node_id)
+            
+            my_game.display_game_state()
 
     game_running = True
+    days_run = 0
     while game_running:
         game_running = my_game.run_day()
+        days_run += 1
         if not game_running:
             my_game.io.print("\nGAME OVER. All survivors perished.")
             break
+
+        # If running headless, auto-advance until requested days (or continue indefinitely)
+        if headless:
+            if days_to_run is not None and days_run >= days_to_run:
+                print(f"Headless run complete ({days_run} days).")
+                break
+            # otherwise continue silently
+            continue
 
         # Allow players to save mid-session by entering ":save path.json" at the prompt
         user_input = my_game.io.input("\nPress Enter to continue to the next day (or type ':save <path>' / ':quit'): ")

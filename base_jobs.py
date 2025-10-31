@@ -67,6 +67,15 @@ AVAILABLE_BASE_JOBS = {
         risk_level=0, # Very low risk
         fail_consequences={}
     ),
+    "CraftMedkit": BaseJob(
+        id="CraftMedkit",
+        name="Craft Medkit",
+        description="Craft a medkit from scrap and electronic parts.",
+        recommended_skills={"Mechanics": 1},
+        rewards={"Medkit_crafted": 1, "Experience": 5},
+        risk_level=1,
+        fail_consequences={"Scrap_loss": 2}
+    ),
      "CraftAmmunition": BaseJob(
         id="CraftAmmunition",
         name="Craft Ammunition",

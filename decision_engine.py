@@ -97,7 +97,7 @@ def make_decision(
                     break
             if not has_required_skill:
                 can_choose = False
-        
+
         if "attribute" in choice_obj.prerequisites:
             has_required_attribute = False
             for s in affected_survivors:
@@ -111,15 +111,16 @@ def make_decision(
                 can_choose = False
 
         if not can_choose:
-            # print(f"  {i+1}. [LOCKED] {choice_obj.text} - {choice_obj.description} (Prerequisites not met)")
-            continue # Don't display if prerequisites aren't met
+            # Don't display if prerequisites aren't met
+            continue
 
-    calculated_chance = calculate_choice_specific_chance(choice_obj, affected_survivors, game_instance)
-    available_choices.append((i + 1, choice_obj, calculated_chance))
-    io.print(f"  {i+1}. {choice_obj.text} ({calculated_chance:.0f}% chance) - {choice_obj.known_consequences_text}")
+        # Calculate and display this available choice
+        calculated_chance = calculate_choice_specific_chance(choice_obj, affected_survivors, game_instance)
+        available_choices.append((i + 1, choice_obj, calculated_chance))
+        io.print(f"  {i+1}. {choice_obj.text} ({calculated_chance:.0f}% chance) - {choice_obj.known_consequences_text}")
 
     if not available_choices:
-        print("No viable choices available for this situation. Defaulting to 'Wait'.")
+        io.print("No viable choices available for this situation. Defaulting to 'Wait'.")
         # Handle default action or forced failure
         return "failure", {"info": "No viable choices, forced to wait/fail."}
 

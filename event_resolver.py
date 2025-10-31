@@ -8,6 +8,7 @@ from utils import roll_d100, chance_check
 from quests import Quest
 from base_jobs import BaseJob
 from skills import AVAILABLE_SKILLS
+from crafting import craft_item
 
 # --- Constants for Event Resolution ---
 BASE_SUCCESS_CHANCE = 50
@@ -89,9 +90,25 @@ def resolve_action(
                 for s in survivors:
                     print(f"{s.name} gained {qty} Experience.")
             elif res.endswith("_crafted"):
+                # Map "Medkit_crafted" -> recipe id "Medkit"
                 item_name = res.replace("_crafted", "")
-                game_instance.add_resource(item_name, qty * (2 if is_critical_success else 1))
-                print(f"  Crafted {qty * (2 if is_critical_success else 1)} {item_name}.")
+                qty_final = qty * (2 if is_critical_success else 1)
+                # If a survivor performed the base job, give the item to the first survivor; otherwise put into global resources
+                target_survivor = survivors[0] if survivors else None
+                craft_result = craft_item(game_instance, item_name, quantity=qty_final, survivor=target_survivor)
+                if craft_result.get("success"):
+                    if target_survivor:
+                        print(f"  Crafted {craft_result.get('produced_qty')} {item_name} for {target_survivor.name}.")
+                    else:
+                        print(f"  Crafted {craft_result.get('produced_qty')} {item_name} into global storage.")
+                else:
+                    # Fall back to original behavior: if crafting failed due to insufficient resources, apply as resource if possible
+                    if craft_result.get("consumed"):
+                        # resources were consumed but crafting failed — this is a bad outcome; apply fail consequences if present
+                        print(f"  Crafting of {item_name} failed after consuming resources.")
+                    else:
+                        game_instance.add_resource(item_name, qty_final)
+                        print(f"  Insufficient resources for crafting {item_name}; added raw {item_name} as resource.")
             else:
                 game_instance.add_resource(res, qty * (2 if is_critical_success else 1))
         print(f"  Rewards received: {rewards}")

@@ -318,6 +318,12 @@ def character_creation_menu() -> Survivor:
     return final_survivor
 
 
+def create_new_survivor() -> Survivor:
+    """Compatibility wrapper expected by `game.py`.
+    Calls the interactive character creation menu and returns the created Survivor.
+    """
+    return character_creation_menu()
+
 # --- Example Usage (for testing the character creator) ---
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
