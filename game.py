@@ -18,6 +18,9 @@ TRAVEL_VEHICLE_BREAKDOWN_CHANCE = 15 # % chance to check for breakdown (e.g., 15
 class Game:
     def __init__(self, start_day=1):
         self.game_day = start_day
+        # IO handler for interactive prompts; can be replaced with HeadlessIO for tests
+        from io_handler import ConsoleIO
+        self.io = ConsoleIO()
         self.survivors: list[Survivor] = []
         self.global_resources: dict[str, int] = {
             "Food": 0,
@@ -216,7 +219,7 @@ class Game:
             print("1. Assign to Quest")
             print("2. Assign to Base Job")
             print("3. Travel to New Node")
-            action_type_choice = input("> ").strip().lower()
+            action_type_choice = self.io.input("> ").strip().lower()
 
             if action_type_choice == 'done':
                 break
@@ -232,7 +235,7 @@ class Game:
                 for i, quest in enumerate(quest_options):
                     print(f"  {i+1}. {quest.name} (Danger: {quest.danger_rating}, Rec. Survivors: {quest.required_survivors}, Rec. Skills: {quest.recommended_skills})")
                 
-                quest_choice_idx = input("Enter quest number to assign: ").strip()
+                quest_choice_idx = self.io.input("Enter quest number to assign: ").strip()
                 if quest_choice_idx.isdigit() and 1 <= int(quest_choice_idx) <= len(quest_options):
                     chosen_quest = quest_options[int(quest_choice_idx) - 1]
                     
@@ -248,7 +251,7 @@ class Game:
                         for i, s in enumerate(temp_assignable):
                             print(f"  {i+1}. {s.name} (HP: {s.current_hp:.1f}, Stress: {s.current_stress:.1f})")
                         
-                        survivor_choice_idx = input("> ").strip()
+                        survivor_choice_idx = self.io.input("> ").strip()
                         if survivor_choice_idx.isdigit() and 1 <= int(survivor_choice_idx) <= len(temp_assignable):
                             selected_survivor = temp_assignable.pop(int(survivor_choice_idx) - 1)
                             assigned_to_quest.append(selected_survivor)
@@ -275,7 +278,7 @@ class Game:
                 for i, job in enumerate(job_options):
                     print(f"  {i+1}. {job.name} (Risk: {job.risk_level}, Rec. Skills: {job.recommended_skills})")
                 
-                job_choice_idx = input("Enter job number to assign: ").strip()
+                job_choice_idx = self.io.input("Enter job number to assign: ").strip()
                 if job_choice_idx.isdigit() and 1 <= int(job_choice_idx) <= len(job_options):
                     chosen_job = job_options[int(job_choice_idx) - 1]
                     
@@ -283,7 +286,7 @@ class Game:
                     for i, s in enumerate(assignable_survivors):
                         print(f"  {i+1}. {s.name} (HP: {s.current_hp:.1f}, Stress: {s.current_stress:.1f})")
                     
-                    survivor_choice_idx = input("> ").strip()
+                    survivor_choice_idx = self.io.input("> ").strip()
                     if survivor_choice_idx.isdigit() and 1 <= int(survivor_choice_idx) <= len(assignable_survivors):
                         selected_survivor = assignable_survivors[int(survivor_choice_idx) - 1]
                         self.assigned_actions.append({"type": "base_job", "action_obj": chosen_job, "survivors": [selected_survivor]})
@@ -309,7 +312,7 @@ class Game:
                     if node_obj:
                         print(f"  {i+1}. {node_obj.name} (Danger: {node_obj.danger_level}, Hazard: {node_obj.hazard_type if node_obj.hazard_type else 'None'})")
                 
-                travel_choice_idx = input("Enter node number to travel to: ").strip()
+                travel_choice_idx = self.io.input("Enter node number to travel to: ").strip()
                 if travel_choice_idx.isdigit() and 1 <= int(travel_choice_idx) <= len(connected_nodes_list):
                     target_node_id = connected_nodes_list[int(travel_choice_idx) - 1]
                     
@@ -438,7 +441,8 @@ class Game:
                             choices=post_clear_choices,
                             game_instance=self,
                             affected_survivors=survivors_on_action,
-                            node_danger=self.current_node.danger_level
+                            node_danger=self.current_node.danger_level,
+                            io_handler=self.io
                         )
                         if "resource_gain" in effects:
                             for res, qty in effects["resource_gain"].items():
@@ -497,7 +501,8 @@ class Game:
                             choices=trader_log_choices,
                             game_instance=self,
                             affected_survivors=survivors_on_action,
-                            node_danger=self.current_node.danger_level
+                            node_danger=self.current_node.danger_level,
+                            io_handler=self.io
                         )
                         if "resource_gain" in effects:
                             for res, qty in effects["resource_gain"].items():
@@ -546,8 +551,9 @@ class Game:
                         prompt="A lone survivor approaches your mobile base. What do you do?",
                         choices=visitor_choices,
                         game_instance=self,
-                        affected_survivors=[decision_maker],
-                        node_danger=self.current_node.danger_level if self.current_node else 1
+                            affected_survivors=[decision_maker],
+                            node_danger=self.current_node.danger_level if self.current_node else 1,
+                            io_handler=self.io
                     )
                     if "recruit_survivor" in effects and effects["recruit_survivor"]:
                         # Lazy import so tests that import Game don't require character_creator at module import time
@@ -663,10 +669,10 @@ def start_game_session():
     while game_running:
         game_running = my_game.run_day()
         if not game_running:
-            print("\nGAME OVER. All survivors perished.")
+            my_game.io.print("\nGAME OVER. All survivors perished.")
             break
         
-        input("\nPress Enter to continue to the next day...")
+        my_game.io.input("\nPress Enter to continue to the next day...")
 
     print("\n--- End of Game Session ---")
 

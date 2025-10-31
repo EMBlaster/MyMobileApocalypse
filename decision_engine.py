@@ -64,7 +64,8 @@ def make_decision(
     choices: List[Choice],
     game_instance: Any, # Game instance to interact with (resources, survivors, etc.)
     affected_survivors: List[Survivor] = None, # Survivors directly involved in the decision
-    node_danger: int = 0 # Contextual danger level
+    node_danger: int = 0, # Contextual danger level
+    io_handler=None
 ) -> Tuple[str, dict]: # Returns (outcome_type: "success"/"failure"/"critical_success"/"critical_failure", effects_applied)
     """
     Presents a decision prompt to the player and processes their chosen action.
@@ -72,8 +73,11 @@ def make_decision(
     if affected_survivors is None:
         affected_survivors = []
 
-    print(f"\n--- DECISION POINT ---")
-    print(f"PROMPT: {prompt}")
+    # Use provided IO handler (for headless testing) or fall back to console input/print
+    from io_handler import ConsoleIO
+    io = io_handler or ConsoleIO()
+    io.print(f"\n--- DECISION POINT ---")
+    io.print(f"PROMPT: {prompt}")
 
     available_choices = []
     for i, choice_obj in enumerate(choices):
@@ -107,9 +111,9 @@ def make_decision(
             # print(f"  {i+1}. [LOCKED] {choice_obj.text} - {choice_obj.description} (Prerequisites not met)")
             continue # Don't display if prerequisites aren't met
 
-        calculated_chance = calculate_choice_specific_chance(choice_obj, affected_survivors, game_instance)
-        available_choices.append((i + 1, choice_obj, calculated_chance))
-        print(f"  {i+1}. {choice_obj.text} ({calculated_chance:.0f}% chance) - {choice_obj.known_consequences_text}")
+    calculated_chance = calculate_choice_specific_chance(choice_obj, affected_survivors, game_instance)
+    available_choices.append((i + 1, choice_obj, calculated_chance))
+    io.print(f"  {i+1}. {choice_obj.text} ({calculated_chance:.0f}% chance) - {choice_obj.known_consequences_text}")
 
     if not available_choices:
         print("No viable choices available for this situation. Defaulting to 'Wait'.")
@@ -119,18 +123,18 @@ def make_decision(
     choice_map = {str(opt[0]): (opt[1], opt[2]) for opt in available_choices} # Map display number to (choice_obj, calculated_chance)
 
     while True:
-        player_input = input(f"Enter your choice (1-{len(available_choices)}): ").strip()
+        player_input = io.input(f"Enter your choice (1-{len(available_choices)}): ").strip()
         if player_input in choice_map:
             chosen_choice_obj, final_chance = choice_map[player_input]
             break
         else:
-            print("Invalid choice. Please enter a valid number.")
+            io.print("Invalid choice. Please enter a valid number.")
             
-    print(f"You chose: '{chosen_choice_obj.text}' (Calculated Chance: {final_chance:.0f}%)")
+    io.print(f"You chose: '{chosen_choice_obj.text}' (Calculated Chance: {final_chance:.0f}%)")
 
     # --- Resolve Outcome ---
     roll = roll_d100()
-    print(f"Roll: {roll}")
+    io.print(f"Roll: {roll}")
 
     is_successful = roll <= final_chance
     is_critical_success = is_successful and roll >= CRITICAL_SUCCESS_THRESHOLD # Reusing thresholds from event_resolver
@@ -140,28 +144,28 @@ def make_decision(
     effects_to_apply = {}
 
     if is_critical_success:
-        print("CRITICAL SUCCESS!")
+        io.print("CRITICAL SUCCESS!")
         outcome_type = "critical_success"
         effects_to_apply = chosen_choice_obj.effects_on_success
         # Potentially add critical success bonus to effects_to_apply
     elif is_successful:
-        print("SUCCESS!")
+        io.print("SUCCESS!")
         outcome_type = "success"
         effects_to_apply = chosen_choice_obj.effects_on_success
     elif is_critical_failure:
-        print("CRITICAL FAILURE!")
+        io.print("CRITICAL FAILURE!")
         outcome_type = "critical_failure"
         effects_to_apply = chosen_choice_obj.effects_on_failure
         # Potentially add critical failure penalty to effects_to_apply
     else:
-        print("FAILURE.")
+        io.print("FAILURE.")
         outcome_type = "failure"
         effects_to_apply = chosen_choice_obj.effects_on_failure
     
     # Placeholder for actually applying effects
     # This will typically involve calling methods on game_instance and affected_survivors
     # For now, we'll just print them and return for the caller to handle.
-    print(f"Outcome Effects: {effects_to_apply}")
+    io.print(f"Outcome Effects: {effects_to_apply}")
 
     return outcome_type, effects_to_apply
 

@@ -1,0 +1,24 @@
+Fix map gen; add tests for map/combat/decision; add CI workflow
+
+
+FILES:
+
+.github/workflows/ci.yml
+.gitignore
+LICENSE
+README.md
+base_jobs.py
+character_creator.py
+combat_engine.py
+decision_engine.py
+game.py
+map_nodes.py
+quests.py
+skills.py
+survivor.py
+tests/test_combat_engine.py
+tests/test_decision_engine.py
+tests/test_map_generation.py
+traits.py
+utils.py
+zombies.py
