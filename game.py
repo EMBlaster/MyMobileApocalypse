@@ -2,7 +2,6 @@ import random
 from survivor import Survivor
 from utils import roll_dice, chance_check
 from map_nodes import Node, AVAILABLE_NODES
-from character_creator import create_new_survivor
 from quests import Quest, AVAILABLE_QUESTS
 from base_jobs import BaseJob, AVAILABLE_BASE_JOBS
 from event_resolver import resolve_action
@@ -97,11 +96,14 @@ class Game:
                 print(f"  Connected {previous_node_id} <--> {new_node.id}")
             previous_node_id = new_node.id
         
+        # Edge-case: ensure the first two selected nodes are connected (fixes a previous typo here)
         if len(self.game_map) > 1 and not self.game_map[selected_node_ids[0]].connected_nodes:
+            first_node_id = selected_node_ids[0]
             second_node_id = selected_node_ids[1]
-            self.game_map[selected_node_ids[0]].connected_nodes.append(second_node_id)
-            self.game_map[second_node_ids].connected_nodes.append(selected_node_ids[0])
-            print(f"  Ensured connection between first two nodes: {selected_node_ids[0]} <--> {second_node_id}")
+            # append ids to each other's connected_nodes lists
+            self.game_map[first_node_id].connected_nodes.append(second_node_id)
+            self.game_map[second_node_id].connected_nodes.append(first_node_id)
+            print(f"  Ensured connection between first two nodes: {first_node_id} <--> {second_node_id}")
 
         print("Map generation complete.")
         if self.game_map:
@@ -548,6 +550,8 @@ class Game:
                         node_danger=self.current_node.danger_level if self.current_node else 1
                     )
                     if "recruit_survivor" in effects and effects["recruit_survivor"]:
+                        # Lazy import so tests that import Game don't require character_creator at module import time
+                        from character_creator import create_new_survivor
                         new_recruit = create_new_survivor()
                         self.add_survivor(new_recruit)
                         print(f"A new survivor, {new_recruit.name}, joined your group!")
@@ -629,7 +633,9 @@ def start_game_session():
     my_game = Game(start_day=1)
 
     print("\n--- Create your first survivor (Leader) ---")
-    leader = create_new_survivor() 
+    # Import character creation lazily so modules that import Game (e.g. tests) don't require character_creator
+    from character_creator import create_new_survivor
+    leader = create_new_survivor()
     my_game.add_survivor(leader)
     
     print("\n--- Creating a second survivor ---")
