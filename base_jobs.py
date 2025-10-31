@@ -1,3 +1,8 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 class BaseJob:
     """
     Represents a job that survivors can perform while remaining at the mobile base.
@@ -75,12 +80,13 @@ AVAILABLE_BASE_JOBS = {
 
 # --- Example Usage ---
 if __name__ == "__main__":
-    print("--- Available Base Jobs ---")
+    logging.basicConfig(level=logging.INFO)
+    logger.info("--- Available Base Jobs ---")
     for job_id, job in AVAILABLE_BASE_JOBS.items():
-        print(f"\nID: {job.id}")
-        print(f"Name: {job.name}")
-        print(f"Description: {job.description}")
-        print(f"Risk Level: {job.risk_level}")
-        print(f"Recommended Skills: {job.recommended_skills}")
-        print(f"Rewards: {job.rewards}")
-        print(f"Fail Consequences: {job.fail_consequences}")
+        logger.info("\nID: %s", job.id)
+        logger.info("Name: %s", job.name)
+        logger.info("Description: %s", job.description)
+        logger.info("Risk Level: %s", job.risk_level)
+        logger.info("Recommended Skills: %s", job.recommended_skills)
+        logger.info("Rewards: %s", job.rewards)
+        logger.info("Fail Consequences: %s", job.fail_consequences)

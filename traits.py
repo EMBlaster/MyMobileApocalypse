@@ -1,3 +1,8 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 class Trait:
     """
     Represents a character trait with its effects and point cost.
@@ -121,14 +126,15 @@ AVAILABLE_TRAITS = {
 
 # --- Example Usage (for testing your code) ---
 if __name__ == "__main__":
-    print("--- Available Traits ---")
+    logging.basicConfig(level=logging.INFO)
+    logger.info("--- Available Traits ---")
     for name, trait in AVAILABLE_TRAITS.items():
-        print(f"- {name}: {trait.description} (Cost: {trait.point_cost} points)")
+        logger.info("- %s: %s (Cost: %s points)", name, trait.description, trait.point_cost)
         if trait.conflicts:
-            print(f"  Conflicts with: {', '.join(trait.conflicts)}")
+            logger.info("  Conflicts with: %s", ', '.join(trait.conflicts))
         if trait.effects:
-            print(f"  Effects: {trait.effects}")
+            logger.info("  Effects: %s", trait.effects)
 
     # Example of accessing a trait
     brave_trait = AVAILABLE_TRAITS["Brave"]
-    print(f"\nDetails for Brave trait: {brave_trait.description}, STR mod: {brave_trait.effects.get('STR_mod', 'N/A')}")
+    logger.info("\nDetails for Brave trait: %s, STR mod: %s", brave_trait.description, brave_trait.effects.get('STR_mod', 'N/A'))

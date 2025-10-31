@@ -1,4 +1,7 @@
 import random
+import logging
+
+logger = logging.getLogger(__name__)
 from typing import List, Dict, Any, Tuple, Union # Make sure Union is imported here
 from survivor import Survivor
 from zombies import Zombie, AVAILABLE_ZOMBIES # Import Zombie class and predefined types
@@ -207,7 +210,8 @@ if __name__ == "__main__":
     from character_creator import create_new_survivor
     from zombies import AVAILABLE_ZOMBIES
     
-    print("--- Setting up Combat Test Scenario ---")
+    logging.basicConfig(level=logging.INFO)
+    logger.info("--- Setting up Combat Test Scenario ---")
     test_game = Game()
 
     # Create survivors
@@ -253,9 +257,9 @@ if __name__ == "__main__":
         node_danger=3 # Test danger level
     )
 
-    print("\n--- Final Combat Results Summary ---")
-    print(combat_results)
+    logger.info("\n--- Final Combat Results Summary ---")
+    logger.info(combat_results)
     for s in test_game.survivors:
-        print(f"{s.name}: HP={s.current_hp:.2f}/{s.max_hp:.2f}, Stress={s.current_stress:.2f}/{s.max_stress:.2f}, Alive={s.is_alive}")
+        logger.info("%s: HP=%.2f/%.2f, Stress=%.2f/%.2f, Alive=%s", s.name, s.current_hp, s.max_hp, s.current_stress, s.max_stress, s.is_alive)
     for z in zombie_horde:
-        print(f"{z.name} ({z.id}): HP={z.current_hp}/{z.base_hp}, Alive={z.is_alive}")
+        logger.info("%s (%s): HP=%s/%s, Alive=%s", z.name, z.id, z.current_hp, z.base_hp, z.is_alive)

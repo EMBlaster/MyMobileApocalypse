@@ -2,6 +2,9 @@ from survivor import Survivor
 from traits import AVAILABLE_TRAITS, Trait
 from skills import AVAILABLE_SKILLS, Skill
 import os # For clearing the console (optional)
+import logging
+
+logger = logging.getLogger(__name__)
 
 # --- Constants for Character Creation ---
 STARTING_POINTS_POOL = 50
@@ -317,12 +320,13 @@ def character_creation_menu() -> Survivor:
 
 # --- Example Usage (for testing the character creator) ---
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     test_survivor = character_creation_menu()
-    print("\n--- Test Survivor Details ---")
-    print(f"Name: {test_survivor.name}")
-    print(f"HP: {test_survivor.current_hp}/{test_survivor.max_hp}")
-    print(f"Stress: {test_survivor.current_stress}/{test_survivor.max_stress}")
-    print(f"Is Alive: {test_survivor.is_alive}")
-    print(f"Attributes: {test_survivor.attributes}")
-    print(f"Skills: {test_survivor.skills}")
-    print(f"Traits: {test_survivor.traits}")
+    logger.info("\n--- Test Survivor Details ---")
+    logger.info("Name: %s", test_survivor.name)
+    logger.info("HP: %s/%s", test_survivor.current_hp, test_survivor.max_hp)
+    logger.info("Stress: %s/%s", test_survivor.current_stress, test_survivor.max_stress)
+    logger.info("Is Alive: %s", test_survivor.is_alive)
+    logger.info("Attributes: %s", test_survivor.attributes)
+    logger.info("Skills: %s", test_survivor.skills)
+    logger.info("Traits: %s", test_survivor.traits)

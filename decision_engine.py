@@ -1,4 +1,7 @@
 from typing import List, Dict, Any, Tuple
+import logging
+
+logger = logging.getLogger(__name__)
 from survivor import Survivor
 from utils import roll_d100, chance_check # Need chance_check, might need roll_d100 directly
 from skills import AVAILABLE_SKILLS # To potentially check skill levels for prerequisites/bonuses
@@ -175,7 +178,8 @@ if __name__ == "__main__":
     from game import Game # Need Game context for some checks
     from character_creator import create_new_survivor
 
-    print("--- Setting up test scenario for Decision Engine ---")
+    logging.basicConfig(level=logging.INFO)
+    logger.info("--- Setting up test scenario for Decision Engine ---")
     test_game = Game()
     test_survivor1 = create_new_survivor() # Create a survivor
     test_survivor1.learn_skill("Scouting", 2) # Give a skill
@@ -223,7 +227,7 @@ if __name__ == "__main__":
     )
 
     # --- Run some decisions ---
-    print("\n--- Decision 1: Encountering Zombies ---")
+    logger.info("\n--- Decision 1: Encountering Zombies ---")
     outcome, effects = make_decision(
         prompt="A small horde of zombies blocks your path. What do you do?",
         choices=[choice_fight, choice_flee, choice_ambush, choice_int_check],
@@ -231,11 +235,11 @@ if __name__ == "__main__":
         affected_survivors=[test_survivor1],
         node_danger=3
     )
-    print(f"Decision Outcome: {outcome}, Effects: {effects}")
-    print(f"Survivor HP: {test_survivor1.current_hp:.2f}, Stress: {test_survivor1.current_stress:.2f}")
+    logger.info("Decision Outcome: %s, Effects: %s", outcome, effects)
+    logger.info("Survivor HP: %.2f, Stress: %.2f", test_survivor1.current_hp, test_survivor1.current_stress)
 
     # Test with no matching prereqs (flee and ambush will be effectively unavailable if driving/stealth not on survivor1)
-    print("\n--- Decision 2: No obvious solution ---")
+    logger.info("\n--- Decision 2: No obvious solution ---")
     test_survivor2 = Survivor(name="Clumsy", str_val=3, agi_val=3, int_val=3, per_val=3, chr_val=3, con_val=3, san_val=3)
     test_game.add_survivor(test_survivor2) # Add a new survivor without skills
     outcome, effects = make_decision(
@@ -248,4 +252,4 @@ if __name__ == "__main__":
         affected_survivors=[test_survivor2],
         node_danger=1
     )
-    print(f"Decision Outcome: {outcome}, Effects: {effects}")
+    logger.info("Decision Outcome: %s, Effects: %s", outcome, effects)

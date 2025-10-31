@@ -1,3 +1,8 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 class Quest:
     """
     Represents a quest or expedition that survivors can undertake.
@@ -70,13 +75,14 @@ AVAILABLE_QUESTS = {
 
 # --- Example Usage ---
 if __name__ == "__main__":
-    print("--- Available Quests ---")
+    logging.basicConfig(level=logging.INFO)
+    logger.info("--- Available Quests ---")
     for q_id, quest in AVAILABLE_QUESTS.items():
-        print(f"\nID: {quest.id}")
-        print(f"Name: {quest.name}")
-        print(f"Description: {quest.description}")
-        print(f"Danger: {quest.danger_rating}")
-        print(f"Required Survivors: {quest.required_survivors}")
-        print(f"Recommended Skills: {quest.recommended_skills}")
-        print(f"Rewards: {quest.rewards}")
-        print(f"Fail Consequences: {quest.fail_consequences}")
+        logger.info("\nID: %s", quest.id)
+        logger.info("Name: %s", quest.name)
+        logger.info("Description: %s", quest.description)
+        logger.info("Danger: %s", quest.danger_rating)
+        logger.info("Required Survivors: %s", quest.required_survivors)
+        logger.info("Recommended Skills: %s", quest.recommended_skills)
+        logger.info("Rewards: %s", quest.rewards)
+        logger.info("Fail Consequences: %s", quest.fail_consequences)

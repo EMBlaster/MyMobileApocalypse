@@ -1,4 +1,7 @@
 from typing import List, Dict
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Zombie:
     """
@@ -91,28 +94,29 @@ AVAILABLE_ZOMBIES = {
 
 # --- Example Usage (for testing the Zombie class) ---
 if __name__ == "__main__":
-    print("--- Available Zombie Types ---")
+    logging.basicConfig(level=logging.INFO)
+    logger.info("--- Available Zombie Types ---")
     for z_id, zombie in AVAILABLE_ZOMBIES.items():
-        print(f"\nID: {zombie.id}")
-        print(f"Name: {zombie.name}")
-        print(f"Description: {zombie.description}")
-        print(f"HP: {zombie.current_hp}/{zombie.base_hp}")
-        print(f"Damage: {zombie.damage}")
-        print(f"Speed: {zombie.speed}")
-        print(f"Defense: {zombie.defense}")
-        print(f"Traits: {', '.join(zombie.traits) if zombie.traits else 'None'}")
+        logger.info("\nID: %s", zombie.id)
+        logger.info("Name: %s", zombie.name)
+        logger.info("Description: %s", zombie.description)
+        logger.info("HP: %s/%s", zombie.current_hp, zombie.base_hp)
+        logger.info("Damage: %s", zombie.damage)
+        logger.info("Speed: %s", zombie.speed)
+        logger.info("Defense: %s", zombie.defense)
+        logger.info("Traits: %s", ', '.join(zombie.traits) if zombie.traits else 'None')
 
     # Example of a zombie taking damage
     test_shambler = AVAILABLE_ZOMBIES["shambler"]
-    print(f"\nTesting: {test_shambler.name} (HP: {test_shambler.current_hp})")
+    logger.info("\nTesting: %s (HP: %s)", test_shambler.name, test_shambler.current_hp)
     test_shambler.take_damage(15)
     test_shambler.take_damage(20) # Should defeat it
-    print(f"Is Shambler alive: {test_shambler.is_alive}")
+    logger.info("Is Shambler alive: %s", test_shambler.is_alive)
 
     # Create a new instance for a fresh HP pool if needed for repeated testing
     new_charger = Zombie(
         id="charger_instance_1", name="Charger", description="Fast and aggressive",
         base_hp=50, damage=15, speed=8, defense=10, traits=["Fast", "Aggressive"]
     )
-    print(f"\nTesting: {new_charger.name} (HP: {new_charger.current_hp})")
+    logger.info("\nTesting: %s (HP: %s)", new_charger.name, new_charger.current_hp)
     new_charger.take_damage(20)

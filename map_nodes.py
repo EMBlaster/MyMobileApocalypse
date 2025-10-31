@@ -1,3 +1,8 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 class Node:
     """
     Represents a single location on the game map.
@@ -91,24 +96,25 @@ AVAILABLE_NODES = {
 
 # --- Example Usage (for testing the Node class) ---
 if __name__ == "__main__":
-    print("--- Available Nodes ---")
+    logging.basicConfig(level=logging.INFO)
+    logger.info("--- Available Nodes ---")
     for node_id, node in AVAILABLE_NODES.items():
-        print(f"\nID: {node.id}")
-        print(f"Name: {node.name}")
-        print(f"Description: {node.description}")
-        print(f"Danger Level: {node.danger_level}")
-        print(f"Hazard Type: {node.hazard_type if node.hazard_type else 'None'}")
-        print(f"Connected Nodes: {', '.join(node.connected_nodes)}")
-        print(f"Potential Quests: {', '.join(node.potential_quests) if node.potential_quests else 'None'}")
-        print(f"Available Resources: {node.available_resources}")
-        print(f"Visited: {node.is_visited}")
+        logger.info("\nID: %s", node.id)
+        logger.info("Name: %s", node.name)
+        logger.info("Description: %s", node.description)
+        logger.info("Danger Level: %s", node.danger_level)
+        logger.info("Hazard Type: %s", node.hazard_type if node.hazard_type else 'None')
+        logger.info("Connected Nodes: %s", ', '.join(node.connected_nodes))
+        logger.info("Potential Quests: %s", ', '.join(node.potential_quests) if node.potential_quests else 'None')
+        logger.info("Available Resources: %s", node.available_resources)
+        logger.info("Visited: %s", node.is_visited)
 
     # Example of accessing a specific node
     gas_station = AVAILABLE_NODES["city_outskirts_01"]
-    print(f"\nDetails for {gas_station.name}:")
-    print(f"Connected to: {gas_station.connected_nodes}")
-    print(f"Resources: {gas_station.available_resources}")
+    logger.info("\nDetails for %s:", gas_station.name)
+    logger.info("Connected to: %s", gas_station.connected_nodes)
+    logger.info("Resources: %s", gas_station.available_resources)
 
     # Simulating visiting a node
     gas_station.is_visited = True
-    print(f"Visited status for {gas_station.name}: {gas_station.is_visited}")
+    logger.info("Visited status for %s: %s", gas_station.name, gas_station.is_visited)

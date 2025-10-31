@@ -1,3 +1,8 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 class Skill:
     """
     Represents a character skill with its prerequisites, effects by level, and point cost.
@@ -137,17 +142,18 @@ AVAILABLE_SKILLS = {
 
 # --- Example Usage (for testing the Skill class) ---
 if __name__ == "__main__":
-    print("--- Available Skills ---")
+    logging.basicConfig(level=logging.INFO)
+    logger.info("--- Available Skills ---")
     for name, skill in AVAILABLE_SKILLS.items():
-        print(f"\n- {name}: {skill.description} (Cost: {skill.cost_to_learn} points)")
-        print(f"  Prerequisites: {skill.attribute_prerequisites}")
+        logger.info("\n- %s: %s (Cost: %s points)", name, skill.description, skill.cost_to_learn)
+        logger.info("  Prerequisites: %s", skill.attribute_prerequisites)
         for level, effects in skill.level_effects.items():
-            print(f"    Level {level} Effects: {effects}")
+            logger.info("    Level %s Effects: %s", level, effects)
 
     # Example of accessing a skill
     mechanics_skill = AVAILABLE_SKILLS["Mechanics"]
-    print(f"\nDetails for Mechanics skill: {mechanics_skill.description}")
-    print(f"Level 1 success bonus: {mechanics_skill.level_effects.get(1, {}).get('success_chance_bonus')}")
+    logger.info("\nDetails for Mechanics skill: %s", mechanics_skill.description)
+    logger.info("Level 1 success bonus: %s", mechanics_skill.level_effects.get(1, {}).get('success_chance_bonus'))
 
     first_aid_lvl2_prereq = AVAILABLE_SKILLS["First Aid"].level_effects.get(2, {}).get('attribute_prerequisites')
-    print(f"First Aid Level 2 prerequisite: {first_aid_lvl2_prereq}")
+    logger.info("First Aid Level 2 prerequisite: %s", first_aid_lvl2_prereq)

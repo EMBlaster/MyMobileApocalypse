@@ -1,4 +1,8 @@
 import random
+import json
+import sys
+from pathlib import Path
+from typing import Union
 from survivor import Survivor
 from utils import roll_dice, chance_check
 from map_nodes import Node, AVAILABLE_NODES
@@ -36,6 +40,87 @@ class Game:
         self.assigned_actions: list[dict] = []
 
         print(f"Game initialized. Day: {self.game_day}")
+
+    # --- Serialization / Persistence ---
+    def to_dict(self) -> dict:
+        """Serialize the essential game state to a JSON-serializable dict."""
+        return {
+            "game_day": self.game_day,
+            "global_resources": dict(self.global_resources),
+            "survivors": [s.to_dict() for s in self.survivors],
+            "game_map": {
+                node_id: {
+                    "id": node.id,
+                    "name": node.name,
+                    "description": node.description,
+                    "danger_level": node.danger_level,
+                    "hazard_type": node.hazard_type,
+                    "connected_nodes": list(node.connected_nodes),
+                    "potential_quests": list(node.potential_quests),
+                    "available_resources": dict(node.available_resources),
+                    "is_visited": bool(node.is_visited),
+                }
+                for node_id, node in self.game_map.items()
+            },
+            "current_node_id": self.current_node.id if self.current_node else None,
+            "player_vehicle": None if not self.player_vehicle else getattr(self.player_vehicle, "name", None),
+            "assigned_actions": [] # not persisting transient assigned actions for simplicity
+        }
+
+    def save_to_file(self, path: Union[str, Path]):
+        """Save the current game state to a JSON file at `path`."""
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("w", encoding="utf-8") as fh:
+            json.dump(self.to_dict(), fh, indent=2)
+        print(f"Game saved to {p}")
+
+    @classmethod
+    def load_from_file(cls, path: Union[str, Path]) -> "Game":
+        """Load a saved game from a JSON file and return a Game instance."""
+        p = Path(path)
+        if not p.exists():
+            raise FileNotFoundError(f"Save file not found: {p}")
+        with p.open("r", encoding="utf-8") as fh:
+            data = json.load(fh)
+
+        g = cls(start_day=data.get("game_day", 1))
+        g.global_resources = dict(data.get("global_resources", {}))
+
+        # Restore survivors
+        g.survivors = []
+        from survivor import Survivor as _Survivor
+        for sdata in data.get("survivors", []):
+            try:
+                s = _Survivor.from_dict(sdata)
+            except Exception:
+                # Fallback: create a simple survivor with name only
+                s = _Survivor(name=sdata.get("name", "Unnamed"))
+            g.survivors.append(s)
+
+        # Restore game_map
+        g.game_map = {}
+        from map_nodes import Node as _Node
+        for node_id, ndata in data.get("game_map", {}).items():
+            node_obj = _Node(
+                id=ndata.get("id", node_id),
+                name=ndata.get("name", "Unknown"),
+                description=ndata.get("description", ""),
+                danger_level=ndata.get("danger_level", 1),
+                hazard_type=ndata.get("hazard_type"),
+                connected_nodes=list(ndata.get("connected_nodes", [])),
+                potential_quests=list(ndata.get("potential_quests", [])),
+                available_resources=dict(ndata.get("available_resources", {})),
+            )
+            node_obj.is_visited = bool(ndata.get("is_visited", False))
+            g.game_map[node_obj.id] = node_obj
+
+        current_node_id = data.get("current_node_id")
+        if current_node_id and current_node_id in g.game_map:
+            g.current_node = g.game_map[current_node_id]
+
+        # player_vehicle and assigned_actions left as default / empty for now
+        return g
 
     def add_survivor(self, survivor: Survivor):
         """Adds a Survivor object to the game's active survivor list."""
@@ -636,34 +721,50 @@ class Game:
 
 # --- Main Game Loop (for playing the game) ---
 def start_game_session():
-    my_game = Game(start_day=1)
+    # Allow loading a save via CLI: python game.py --load path/to/save.json
+    load_path = None
+    if "--load" in sys.argv:
+        idx = sys.argv.index("--load")
+        if idx + 1 < len(sys.argv):
+            load_path = sys.argv[idx + 1]
 
-    print("\n--- Create your first survivor (Leader) ---")
-    # Import character creation lazily so modules that import Game (e.g. tests) don't require character_creator
-    from character_creator import create_new_survivor
-    leader = create_new_survivor()
-    my_game.add_survivor(leader)
-    
-    print("\n--- Creating a second survivor ---")
-    survivor_ally = Survivor(name="Ally", con_val=6, san_val=8, int_val=5) 
-    survivor_ally.learn_skill("Mechanics", 1)
-    survivor_ally.learn_skill("Scouting", 1)
-    survivor_ally.learn_skill("Small Arms", 1) # Give a combat skill
-    my_game.add_survivor(survivor_ally)
+    if load_path:
+        try:
+            my_game = Game.load_from_file(load_path)
+            print(f"Loaded game from {load_path}. Resuming day {my_game.game_day}.")
+        except Exception as e:
+            print(f"Failed to load save '{load_path}': {e}")
+            print("Starting a new game instead.")
+            my_game = Game(start_day=1)
+    else:
+        my_game = Game(start_day=1)
 
-    my_game.add_resource("Food", 100)
-    my_game.add_resource("Water", 100)
-    my_game.add_resource("Fuel", 50)
-    my_game.add_resource("Scrap", 50)
-    my_game.add_resource("Ammunition", 20)
-    my_game.add_resource("ElectronicParts", 20)
+        print("\n--- Create your first survivor (Leader) ---")
+        # Import character creation lazily so modules that import Game (e.g. tests) don't require character_creator
+        from character_creator import create_new_survivor
+        leader = create_new_survivor()
+        my_game.add_survivor(leader)
+        
+        print("\n--- Creating a second survivor ---")
+        survivor_ally = Survivor(name="Ally", con_val=6, san_val=8, int_val=5) 
+        survivor_ally.learn_skill("Mechanics", 1)
+        survivor_ally.learn_skill("Scouting", 1)
+        survivor_ally.learn_skill("Small Arms", 1) # Give a combat skill
+        my_game.add_survivor(survivor_ally)
 
-    my_game.generate_map(num_nodes=3)
-    if my_game.game_map:
-        first_node_id = list(my_game.game_map.keys())[0]
-        my_game.set_current_node(first_node_id)
-    
-    my_game.display_game_state()
+        my_game.add_resource("Food", 100)
+        my_game.add_resource("Water", 100)
+        my_game.add_resource("Fuel", 50)
+        my_game.add_resource("Scrap", 50)
+        my_game.add_resource("Ammunition", 20)
+        my_game.add_resource("ElectronicParts", 20)
+
+        my_game.generate_map(num_nodes=3)
+        if my_game.game_map:
+            first_node_id = list(my_game.game_map.keys())[0]
+            my_game.set_current_node(first_node_id)
+        
+        my_game.display_game_state()
 
     game_running = True
     while game_running:
@@ -671,8 +772,20 @@ def start_game_session():
         if not game_running:
             my_game.io.print("\nGAME OVER. All survivors perished.")
             break
-        
-        my_game.io.input("\nPress Enter to continue to the next day...")
+
+        # Allow players to save mid-session by entering ":save path.json" at the prompt
+        user_input = my_game.io.input("\nPress Enter to continue to the next day (or type ':save <path>' / ':quit'): ")
+        if isinstance(user_input, str):
+            trimmed = user_input.strip()
+            if trimmed.startswith(":save "):
+                save_path = trimmed.split(None, 1)[1]
+                try:
+                    my_game.save_to_file(save_path)
+                except Exception as e:
+                    print(f"Failed to save game: {e}")
+            elif trimmed == ":quit":
+                print("Exiting game session. You can resume later with --load <file>")
+                break
 
     print("\n--- End of Game Session ---")
 

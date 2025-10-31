@@ -1,4 +1,7 @@
 import math # Import math for rounding in damage/stress calculations
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Survivor:
     def __init__(self, name="Unnamed",
@@ -165,13 +168,61 @@ class Survivor:
             print(f"{self.name} does not have {quantity} of '{item_name}'. Current: {self.inventory.get(item_name, 0)}")
             return False
 
+    # --- Serialization for save/load ---
+    def to_dict(self) -> dict:
+        """Serialize the survivor to a plain dict for JSON storage."""
+        return {
+            "name": self.name,
+            "attributes": dict(self.attributes),
+            "skills": dict(self.skills),
+            "traits": list(self.traits),
+            "inventory": dict(self.inventory),
+            "base_max_hp": self.base_max_hp,
+            "max_hp": self.max_hp,
+            "current_hp": self.current_hp,
+            "base_max_stress": self.base_max_stress,
+            "max_stress": self.max_stress,
+            "current_stress": self.current_stress,
+            "is_alive": self.is_alive,
+            "is_injured": self.is_injured,
+            "is_stressed": self.is_stressed,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Survivor":
+        """Create a Survivor instance from a serialized dict."""
+        s = cls(name=data.get("name", "Unnamed"),
+                str_val=data.get("attributes", {}).get("STR", 1),
+                agi_val=data.get("attributes", {}).get("AGI", 1),
+                int_val=data.get("attributes", {}).get("INT", 1),
+                per_val=data.get("attributes", {}).get("PER", 1),
+                chr_val=data.get("attributes", {}).get("CHR", 1),
+                con_val=data.get("attributes", {}).get("CON", 1),
+                san_val=data.get("attributes", {}).get("SAN", 1))
+
+        # Restore other fields
+        s.skills = dict(data.get("skills", {}))
+        s.traits = list(data.get("traits", []))
+        s.inventory = dict(data.get("inventory", {}))
+        s.base_max_hp = data.get("base_max_hp", s.base_max_hp)
+        s.max_hp = data.get("max_hp", s.max_hp)
+        s.current_hp = data.get("current_hp", s.current_hp)
+        s.base_max_stress = data.get("base_max_stress", s.base_max_stress)
+        s.max_stress = data.get("max_stress", s.max_stress)
+        s.current_stress = data.get("current_stress", s.current_stress)
+        s.is_alive = data.get("is_alive", s.is_alive)
+        s.is_injured = data.get("is_injured", s.is_injured)
+        s.is_stressed = data.get("is_stressed", s.is_stressed)
+        return s
+
 # --- Example Usage (for testing your code) ---
 if __name__ == "__main__":
-    print("--- Creating Survivors ---")
+    logging.basicConfig(level=logging.INFO)
+    logger.info("--- Creating Survivors ---")
     survivor_alice = Survivor(name="Alice", str_val=5, agi_val=6, int_val=7, per_val=8, chr_val=5, con_val=7, san_val=6)
     survivor_bob = Survivor(name="Bob", str_val=8, agi_val=4, int_val=3, per_val=5, chr_val=4, con_val=9, san_val=3)
 
-    print("\n--- Testing Alice's Skills, Traits, Inventory ---")
+    logger.info("--- Testing Alice's Skills, Traits, Inventory ---")
     survivor_alice.learn_skill("Mechanics", 1)
     survivor_alice.learn_skill("Driving", 2)
     survivor_alice.add_trait("Optimist")
@@ -179,25 +230,25 @@ if __name__ == "__main__":
     survivor_alice.add_item_to_inventory("Bandage", 3)
     survivor_alice.add_item_to_inventory("Pistol", 1)
 
-    print(f"Alice's skills: {survivor_alice.skills}")
-    print(f"Alice's traits: {survivor_alice.traits}")
-    print(f"Alice's inventory: {survivor_alice.inventory}")
+    logger.info("Alice's skills: %s", survivor_alice.skills)
+    logger.info("Alice's traits: %s", survivor_alice.traits)
+    logger.info("Alice's inventory: %s", survivor_alice.inventory)
     survivor_alice.remove_item_from_inventory("Bandage", 1)
     survivor_alice.remove_item_from_inventory("NonExistentItem")
 
-    print("\n--- Testing Bob's HP/Stress thresholds ---")
-    print(f"Bob's HP: {survivor_bob.current_hp}/{survivor_bob.max_hp}, Is Injured: {survivor_bob.is_injured}")
+    logger.info("--- Testing Bob's HP/Stress thresholds ---")
+    logger.info("Bob's HP: %s/%s, Is Injured: %s", survivor_bob.current_hp, survivor_bob.max_hp, survivor_bob.is_injured)
     survivor_bob.take_damage(50) # Should make Bob injured (CON 9, so good reduction)
-    print(f"Bob's HP: {survivor_bob.current_hp}/{survivor_bob.max_hp}, Is Injured: {survivor_bob.is_injured}")
+    logger.info("Bob's HP: %s/%s, Is Injured: %s", survivor_bob.current_hp, survivor_bob.max_hp, survivor_bob.is_injured)
     survivor_bob.heal(30)
-    print(f"Bob's HP: {survivor_bob.current_hp}/{survivor_bob.max_hp}, Is Injured: {survivor_bob.is_injured}")
+    logger.info("Bob's HP: %s/%s, Is Injured: %s", survivor_bob.current_hp, survivor_bob.max_hp, survivor_bob.is_injured)
 
-    print(f"\nBob's Stress: {survivor_bob.current_stress}/{survivor_bob.max_stress}, Is Stressed: {survivor_bob.is_stressed}")
+    logger.info("Bob's Stress: %s/%s, Is Stressed: %s", survivor_bob.current_stress, survivor_bob.max_stress, survivor_bob.is_stressed)
     survivor_bob.gain_stress(100) # Should make Bob highly stressed (SAN 3, so not much reduction)
-    print(f"Bob's Stress: {survivor_bob.current_stress}/{survivor_bob.max_stress}, Is Stressed: {survivor_bob.is_stressed}")
+    logger.info("Bob's Stress: %s/%s, Is Stressed: %s", survivor_bob.current_stress, survivor_bob.max_stress, survivor_bob.is_stressed)
     survivor_bob.reduce_stress(50)
-    print(f"Bob's Stress: {survivor_bob.current_stress}/{survivor_bob.max_stress}, Is Stressed: {survivor_bob.is_stressed}")
+    logger.info("Bob's Stress: %s/%s, Is Stressed: %s", survivor_bob.current_stress, survivor_bob.max_stress, survivor_bob.is_stressed)
 
-    print("\n--- Final Status ---")
-    print(f"Alice alive: {survivor_alice.is_alive}, HP: {survivor_alice.current_hp:.2f}, Stress: {survivor_alice.current_stress:.2f}, Injured: {survivor_alice.is_injured}, Stressed: {survivor_alice.is_stressed}")
-    print(f"Bob alive: {survivor_bob.is_alive}, HP: {survivor_bob.current_hp:.2f}, Stress: {survivor_bob.current_stress:.2f}, Injured: {survivor_bob.is_injured}, Stressed: {survivor_bob.is_stressed}")
+    logger.info("--- Final Status ---")
+    logger.info("Alice alive: %s, HP: %.2f, Stress: %.2f, Injured: %s, Stressed: %s", survivor_alice.is_alive, survivor_alice.current_hp, survivor_alice.current_stress, survivor_alice.is_injured, survivor_alice.is_stressed)
+    logger.info("Bob alive: %s, HP: %.2f, Stress: %.2f, Injured: %s, Stressed: %s", survivor_bob.is_alive, survivor_bob.current_hp, survivor_bob.current_stress, survivor_bob.is_injured, survivor_bob.is_stressed)

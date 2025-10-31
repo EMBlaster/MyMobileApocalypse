@@ -1,5 +1,8 @@
 import random
 from typing import List, Dict, Any, Tuple, Union
+import logging
+
+logger = logging.getLogger(__name__)
 from survivor import Survivor
 from utils import roll_d100, chance_check
 from quests import Quest
@@ -119,7 +122,8 @@ def resolve_action(
 
 if __name__ == "__main__":
     # Quick demo / smoke-run for local manual testing.
-    # Creates a single survivor and resolves a simple base job to show expected prints.
+    # Creates a single survivor and resolves a simple base job to show expected logs.
+    logging.basicConfig(level=logging.INFO)
     class DummyAction:
         def __init__(self, name, recommended_skills=None, rewards=None, fail_consequences=None):
             self.name = name
@@ -133,9 +137,8 @@ if __name__ == "__main__":
 
         def add_resource(self, name, qty):
             self.resources[name] = self.resources.get(name, 0) + qty
-            print(f"MockGame: added {qty} x {name}. Total now: {self.resources[name]}")
-
-    print("--- event_resolver demo ---")
+            logger.info("MockGame: added %s x %s. Total now: %s", qty, name, self.resources[name])
+    logger.info("--- event_resolver demo ---")
     tester = Survivor(name="Demo", str_val=5, agi_val=5, int_val=6, per_val=4, chr_val=3, con_val=5, san_val=4)
     tester.learn_skill("Mechanics", 2)
 
