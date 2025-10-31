@@ -300,11 +300,26 @@ class Game:
             self.display_game_state()
             print(f"\nSurvivors still needing assignments: {[s.name for s in assignable_survivors]}")
             
-            print("\nChoose an action type (or 'done' to finish assignments):")
-            print("1. Assign to Quest")
-            print("2. Assign to Base Job")
-            print("3. Travel to New Node")
-            action_type_choice = self.io.input("> ").strip().lower()
+            # Present action type choices using IO.present_choices when available
+            action_type_prompt = "Choose an action type (or 'done' to finish assignments):"
+            action_type_opts = ["Assign to Quest", "Assign to Base Job", "Travel to New Node", "Done"]
+            if hasattr(self.io, 'present_choices'):
+                sel = self.io.present_choices(action_type_prompt, [f"{i+1}. {o}" for i, o in enumerate(action_type_opts)])
+                # present_choices returns a string index (e.g., '1') or None
+                if sel is None:
+                    action_type_choice = 'done'
+                else:
+                    try:
+                        idx = int(sel)
+                        action_type_choice = 'done' if idx == 4 else str(idx)
+                    except Exception:
+                        action_type_choice = 'done'
+            else:
+                print("\nChoose an action type (or 'done' to finish assignments):")
+                print("1. Assign to Quest")
+                print("2. Assign to Base Job")
+                print("3. Travel to New Node")
+                action_type_choice = self.io.input("> ").strip().lower()
 
             if action_type_choice == 'done':
                 break
@@ -319,8 +334,12 @@ class Game:
                 quest_options = list(available_quests.values())
                 for i, quest in enumerate(quest_options):
                     print(f"  {i+1}. {quest.name} (Danger: {quest.danger_rating}, Rec. Survivors: {quest.required_survivors}, Rec. Skills: {quest.recommended_skills})")
-                
-                quest_choice_idx = self.io.input("Enter quest number to assign: ").strip()
+                # Use present_choices if IO supports it
+                if hasattr(self.io, 'present_choices'):
+                    sel = self.io.present_choices("Enter quest number to assign:", [f"{i+1}. {q.name}" for i, q in enumerate(quest_options)])
+                    quest_choice_idx = sel or ''
+                else:
+                    quest_choice_idx = self.io.input("Enter quest number to assign: ").strip()
                 if quest_choice_idx.isdigit() and 1 <= int(quest_choice_idx) <= len(quest_options):
                     chosen_quest = quest_options[int(quest_choice_idx) - 1]
                     
@@ -335,8 +354,12 @@ class Game:
                         print(f"Select survivor #{len(assigned_to_quest) + 1} for '{chosen_quest.name}':")
                         for i, s in enumerate(temp_assignable):
                             print(f"  {i+1}. {s.name} (HP: {s.current_hp:.1f}, Stress: {s.current_stress:.1f})")
-                        
-                        survivor_choice_idx = self.io.input("> ").strip()
+                        # choose survivor via present_choices if available
+                        if hasattr(self.io, 'present_choices'):
+                            sel = self.io.present_choices(f"Select survivor #{len(assigned_to_quest) + 1}:", [f"{i+1}. {s.name}" for i, s in enumerate(temp_assignable)])
+                            survivor_choice_idx = sel or ''
+                        else:
+                            survivor_choice_idx = self.io.input("> ").strip()
                         if survivor_choice_idx.isdigit() and 1 <= int(survivor_choice_idx) <= len(temp_assignable):
                             selected_survivor = temp_assignable.pop(int(survivor_choice_idx) - 1)
                             assigned_to_quest.append(selected_survivor)
@@ -362,16 +385,22 @@ class Game:
                 job_options = list(available_jobs.values())
                 for i, job in enumerate(job_options):
                     print(f"  {i+1}. {job.name} (Risk: {job.risk_level}, Rec. Skills: {job.recommended_skills})")
-                
-                job_choice_idx = self.io.input("Enter job number to assign: ").strip()
+                if hasattr(self.io, 'present_choices'):
+                    sel = self.io.present_choices("Enter job number to assign:", [f"{i+1}. {j.name}" for i, j in enumerate(job_options)])
+                    job_choice_idx = sel or ''
+                else:
+                    job_choice_idx = self.io.input("Enter job number to assign: ").strip()
                 if job_choice_idx.isdigit() and 1 <= int(job_choice_idx) <= len(job_options):
                     chosen_job = job_options[int(job_choice_idx) - 1]
                     
                     print(f"Select survivor for '{chosen_job.name}':")
                     for i, s in enumerate(assignable_survivors):
                         print(f"  {i+1}. {s.name} (HP: {s.current_hp:.1f}, Stress: {s.current_stress:.1f})")
-                    
-                    survivor_choice_idx = self.io.input("> ").strip()
+                    if hasattr(self.io, 'present_choices'):
+                        sel = self.io.present_choices("Select survivor:", [f"{i+1}. {s.name}" for i, s in enumerate(assignable_survivors)])
+                        survivor_choice_idx = sel or ''
+                    else:
+                        survivor_choice_idx = self.io.input("> ").strip()
                     if survivor_choice_idx.isdigit() and 1 <= int(survivor_choice_idx) <= len(assignable_survivors):
                         selected_survivor = assignable_survivors[int(survivor_choice_idx) - 1]
                         self.assigned_actions.append({"type": "base_job", "action_obj": chosen_job, "survivors": [selected_survivor]})

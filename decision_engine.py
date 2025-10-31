@@ -126,13 +126,35 @@ def make_decision(
 
     choice_map = {str(opt[0]): (opt[1], opt[2]) for opt in available_choices} # Map display number to (choice_obj, calculated_chance)
 
-    while True:
-        player_input = io.input(f"Enter your choice (1-{len(available_choices)}): ").strip()
+    # If the IO handler provides a present_choices API (e.g., PygameIO), use it so the UI can render a modal.
+    if hasattr(io, 'present_choices'):
+        # Build a simple list of option display strings to send to the UI
+        option_texts = [f"{num}. {obj.text} ({chance:.0f}%)" for num, obj, chance in available_choices]
+        # Ask the IO to present choices and block until a selection is made
+        try:
+            player_input = io.present_choices(f"Enter your choice (1-{len(available_choices)}): ", option_texts)
+        except Exception:
+            player_input = io.input(f"Enter your choice (1-{len(available_choices)}): ").strip()
+    else:
+        while True:
+            player_input = io.input(f"Enter your choice (1-{len(available_choices)}): ").strip()
+            if player_input in choice_map:
+                chosen_choice_obj, final_chance = choice_map[player_input]
+                break
+            else:
+                io.print("Invalid choice. Please enter a valid number.")
+
+    # If we used present_choices, map the result to a choice
+    if hasattr(io, 'present_choices'):
         if player_input in choice_map:
             chosen_choice_obj, final_chance = choice_map[player_input]
-            break
         else:
-            io.print("Invalid choice. Please enter a valid number.")
+            # If the returned value was numeric index, accept it if valid
+            if isinstance(player_input, str) and player_input in choice_map:
+                chosen_choice_obj, final_chance = choice_map[player_input]
+            else:
+                # Fallback: pick the first available
+                chosen_choice_obj, final_chance = available_choices[0][1], available_choices[0][2]
             
     io.print(f"You chose: '{chosen_choice_obj.text}' (Calculated Chance: {final_chance:.0f}%)")
 
